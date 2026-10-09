@@ -1,0 +1,3 @@
+import type { WeatherId } from "./types";
+export interface WeatherDef { id: WeatherId; name: string; desc: string; }
+export const WEATHER: WeatherDef[] = [{ id: "clear", name: "Clear", desc: "Clean air." }, { id: "rain", name: "Rain", desc: "Wet road." }, { id: "heavy-rain", name: "Heavy Rain", desc: "Low visibility." }, { id: "fog", name: "Fog", desc: "Thick atmosphere." }, { id: "snow", name: "Snow", desc: "Snowfall." }, { id: "dust", name: "Dust", desc: "Desert haze." }];

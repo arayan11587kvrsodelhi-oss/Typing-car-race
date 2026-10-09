@@ -1,0 +1,3 @@
+import type { RaceCameraId } from "./types";
+export interface CameraDef { id: RaceCameraId; name: string; desc: string; }
+export const RACE_CAMERAS: CameraDef[] = [{ id: "chase", name: "Chase", desc: "Classic follow." }, { id: "cinematic", name: "Cinematic", desc: "Wide drama." }, { id: "bumper", name: "Bumper", desc: "Low and fast." }, { id: "hood", name: "Hood", desc: "Over the bonnet." }, { id: "cockpit", name: "Cockpit", desc: "Driver view." }, { id: "finish", name: "Finish", desc: "Finish sweep." }];

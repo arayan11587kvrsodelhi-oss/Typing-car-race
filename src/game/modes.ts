@@ -1,0 +1,3 @@
+import type { GameModeId } from "./types";
+export interface ModeDef { id: GameModeId; name: string; blurb: string; }
+export const MODES: ModeDef[] = [{ id: "quick", name: "Quick Race", blurb: "One race." }, { id: "career", name: "Career", blurb: "Campaign." }, { id: "time-attack", name: "Time Attack", blurb: "No rivals." }, { id: "endurance", name: "Endurance", blurb: "Long race." }, { id: "elimination", name: "Elimination", blurb: "Survive." }, { id: "night-run", name: "Night Run", blurb: "Night only." }, { id: "perfect", name: "Perfect Typer", blurb: "Accuracy focus." }, { id: "sprint", name: "Sprint", blurb: "Short dash." }, { id: "circuit", name: "Circuit", blurb: "Standard." }, { id: "marathon", name: "Marathon", blurb: "Long grind." }];
