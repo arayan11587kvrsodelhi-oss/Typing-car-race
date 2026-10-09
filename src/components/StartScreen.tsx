@@ -69,6 +69,7 @@ export function StartScreen({ profile, settings, build, scores, campaign, select
   const stats = effectiveStats(build);
   const best = scores[0];
   const [nameLength, setNameLength] = useState(profile.name.length);
+  const [quickRaceSetup, setQuickRaceSetup] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -143,12 +144,60 @@ export function StartScreen({ profile, settings, build, scores, campaign, select
           {/* body */}
           <div className="flex-1 grid lg:grid-cols-[1.15fr_1fr] gap-6 sm:gap-8 mt-4 items-start">
             <section className="glass rounded-3xl p-5 sm:p-7 animate-slide-up border border-white/5">
-              <CampaignMap
-                levels={LEVELS}
-                progress={campaign}
-                selectedId={selectedLevelId}
-                onSelect={onSelectLevel}
-              />
+              {quickRaceSetup ? (
+                <section className="glass rounded-3xl border border-amber-300/20 p-4 sm:p-6" aria-label="Quick Race setup">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-display text-[10px] uppercase tracking-[0.35em] text-amber-300/80">Quick Race</div>
+                      <h2 className="mt-1 font-display text-2xl font-black text-white sm:text-3xl">Choose your track</h2>
+                      <p className="mt-1 font-ui text-sm text-slate-400">Race any environment without changing campaign progress.</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setQuickRaceSetup(false)}>Back to campaign</Button>
+                  </div>
+                  <div className="mt-5 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Select quick race track">
+                    {ENV_LIST.map((env) => {
+                      const active = env.id === settings.environment;
+                      return (
+                        <button
+                          key={env.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          tabIndex={active ? 0 : -1}
+                          onClick={() => handleEnvSelect(env.id)}
+                          onKeyDown={(e) => handleEnvKeyDown(e, env.id)}
+                          onFocus={() => handleEnvSelect(env.id)}
+                          className={cn(
+                            "relative h-[76px] overflow-hidden rounded-xl border p-2 text-left transition-all duration-200 sm:h-24",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#05070f]",
+                            active
+                              ? "z-10 scale-[1.02] border-cyan-300/70 shadow-[0_0_18px_rgba(34,211,238,0.35)]"
+                              : "border-white/10 hover:border-white/25 hover:shadow-[0_0_12px_rgba(34,211,238,0.15)]",
+                          )}
+                        >
+                          <div className={cn("absolute inset-0 bg-gradient-to-br opacity-80", ENV_GRADIENT[env.id])} aria-hidden="true" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" aria-hidden="true" />
+                          <div className="relative">
+                            <div className="font-display text-[11px] font-bold tracking-wider text-white sm:text-xs">{env.name}</div>
+                            <div className="hidden font-ui text-[10px] leading-tight text-slate-200/80 sm:block">{env.blurb}</div>
+                            {active && <div className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden="true">✓</div>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <Button variant="primary" size="lg" onClick={onQuickRace} className="mt-5 w-full">
+                    Start Quick Race
+                  </Button>
+                </section>
+              ) : (
+                <CampaignMap
+                  levels={LEVELS}
+                  progress={campaign}
+                  selectedId={selectedLevelId}
+                  onSelect={onSelectLevel}
+                />
+              )}
               <div className="grid sm:grid-cols-[1fr_auto] gap-4 items-end">
                 <div>
                   <Label className="mb-1.5 flex items-center gap-2">
@@ -197,47 +246,6 @@ export function StartScreen({ profile, settings, build, scores, campaign, select
                 />
               </div>
               <div className="mt-4">
-                <Label className="mb-1.5">Track</Label>
-                <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Select track environment">
-                  {ENV_LIST.map((env) => {
-                    const active = env.id === settings.environment;
-                    return (
-                      <button
-                        key={env.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        tabIndex={active ? 0 : -1}
-                        onClick={() => handleEnvSelect(env.id)}
-                        onKeyDown={(e) => handleEnvKeyDown(e, env.id)}
-                        onFocus={() => handleEnvSelect(env.id)}
-                        className={cn(
-                          "relative overflow-hidden rounded-xl border p-2 text-left transition-all duration-200 h-[76px] sm:h-24",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#05070f]",
-                          active
-                            ? "border-cyan-300/70 shadow-[0_0_18px_rgba(34,211,238,0.35)] scale-[1.02] z-10"
-                            : "border-white/10 hover:border-white/25 hover:shadow-[0_0_12px_rgba(34,211,238,0.15)]",
-                        )}
-                      >
-                        <div className={cn("absolute inset-0 bg-gradient-to-br opacity-80", ENV_GRADIENT[env.id])} aria-hidden="true" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" aria-hidden="true" />
-                        <div className="relative">
-                          <div className="font-display text-[11px] sm:text-xs font-bold tracking-wider text-white">{env.name}</div>
-                          <div className="text-[10px] text-slate-200/80 font-ui leading-tight hidden sm:block">{env.blurb}</div>
-                          {active && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
-                              <svg className="w-6 h-6 text-cyan-200/90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="mt-4">
                 <Label className="mb-1.5">Graphics</Label>
                 <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Select graphics quality">
                   {(["low", "medium", "high"] as const).map((quality) => (
@@ -272,7 +280,7 @@ export function StartScreen({ profile, settings, build, scores, campaign, select
                   </span>
                   <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-fuchsia-400/20 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
                 </Button>
-                <Button variant="secondary" size="lg" onClick={onQuickRace} className="flex items-center justify-center gap-2">
+                <Button variant="secondary" size="lg" onClick={() => setQuickRaceSetup(true)} className="flex items-center justify-center gap-2">
                   Quick race
                 </Button>
                 <Button variant="secondary" size="lg" onClick={onScores} className="flex items-center justify-center gap-2">
