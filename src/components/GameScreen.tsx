@@ -123,6 +123,7 @@ export function GameScreen({
   // render site.  Mounting the four car models during the countdown starves
   // the rAF loop that advances the simulation.
   const [sceneReady, setSceneReady] = useState(false);
+  const [sceneLoading, setSceneLoading] = useState(false);
 
   // Always use the latest callbacks without rebuilding the game loop.
   const callbacks = useRef({
@@ -196,6 +197,7 @@ export function GameScreen({
     setShowCount(true);
     setResult(null);
     setSceneReady(false);
+    setSceneLoading(false);
 
     audio.init();
 
@@ -396,6 +398,7 @@ export function GameScreen({
 
         // Mount the 3D world as soon as the race leaves the countdown.
         if (engine.state === "running") setSceneReady(true);
+        if (engine.state === "running") setSceneLoading(true);
       }
     };
 
@@ -545,6 +548,10 @@ export function GameScreen({
     focusInput();
   }, [focusInput]);
 
+  const handleSceneReady = useCallback(() => {
+    setSceneLoading(false);
+  }, []);
+
   const playerColor = config.build.custom.paint;
   const paused = gameState === "paused";
 
@@ -603,9 +610,19 @@ export function GameScreen({
               playerBuild={config.build}
               env={engineEnv}
               opponentBuilds={opponentBuilds}
+              quality={config.graphicsQuality ?? "low"}
+              onReady={handleSceneReady}
             />
           )}
         </div>
+
+        {sceneLoading && sceneReady && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="rounded-full border border-cyan-300/30 bg-slate-950/70 px-4 py-2 font-display text-[10px] uppercase tracking-[0.25em] text-cyan-100/80">
+              Preparing race scene
+            </div>
+          </div>
+        )}
 
         <HUD
           hud={hud}

@@ -29,6 +29,7 @@ export type GameModeId =
   | "circuit"
   | "marathon";
 export type RaceCameraId = "chase" | "cinematic" | "bumper" | "hood" | "cockpit" | "finish";
+export type GraphicsQuality = "low" | "medium" | "high";
 
 export type BodyShape = "hatch" | "coupe" | "muscle" | "super" | "hyper" | "truck";
 export type TailStyle = "bar" | "dual" | "round" | "split" | "vertical";
@@ -187,6 +188,7 @@ export interface RaceConfig {
   weather?: WeatherId;
   timeOfDay?: TimeOfDay;
   camera?: RaceCameraId;
+  graphicsQuality?: GraphicsQuality;
   demo?: boolean;
   seed?: number;
 }

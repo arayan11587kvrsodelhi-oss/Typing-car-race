@@ -53,6 +53,7 @@ export default function App() {
       difficulty: s.difficulty,
       distance: s.distance,
       environment: s.environment,
+      graphicsQuality: s.graphicsQuality,
       playerName: p.name || "ACE",
       seed: Math.floor(Math.random() * 1e9),
     });
@@ -129,6 +130,7 @@ export default function App() {
               difficulty: settingsRef.current.difficulty,
               distance: settingsRef.current.distance,
               environment: settingsRef.current.environment,
+              graphicsQuality: settingsRef.current.graphicsQuality,
               playerName: nextProf.name || "ACE",
               seed: Math.floor(Math.random() * 1e9),
             });

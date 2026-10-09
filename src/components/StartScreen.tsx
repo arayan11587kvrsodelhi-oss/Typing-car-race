@@ -225,6 +225,29 @@ export function StartScreen({ profile, settings, build, scores, onSettings, onNa
                   })}
                 </div>
               </div>
+              <div className="mt-4">
+                <Label className="mb-1.5">Graphics</Label>
+                <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Select graphics quality">
+                  {(["low", "medium", "high"] as const).map((quality) => (
+                    <button
+                      key={quality}
+                      type="button"
+                      role="radio"
+                      aria-checked={(settings.graphicsQuality ?? "low") === quality}
+                      onClick={() => onSettings({ graphicsQuality: quality })}
+                      className={cn(
+                        "rounded-lg border px-2 py-2 text-xs font-display uppercase tracking-wider transition-colors",
+                        (settings.graphicsQuality ?? "low") === quality
+                          ? "border-cyan-300/60 bg-cyan-300/15 text-cyan-100"
+                          : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.08]",
+                      )}
+                    >
+                      {quality}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 text-[10px] text-slate-500">Low is recommended for integrated graphics.</p>
+              </div>
 
               <div className="mt-6 flex flex-col sm:flex-row gap-3">
                 <Button variant="primary" size="lg" onClick={onStart} className="flex-1 text-base sm:text-lg py-4.5 font-display relative overflow-hidden group">

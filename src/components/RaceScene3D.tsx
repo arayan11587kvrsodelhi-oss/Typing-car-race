@@ -38,12 +38,12 @@
  * fixed pool.  No allocations and no React state updates during animation.
  */
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { GameEngine } from "@/game/engine";
 import { SEGMENT_LENGTH } from "@/game/track";
-import type { CarBuild } from "@/game/types";
+import type { CarBuild, GraphicsQuality } from "@/game/types";
 import type { EnvPalette } from "@/game/environments";
 import { CarModel3D } from "./garage/CarModel3D";
 
@@ -57,6 +57,8 @@ export interface RaceScene3DProps {
   playerBuild: CarBuild;
   env: EnvPalette;
   opponentBuilds: CarBuild[];
+  quality: GraphicsQuality;
+  onReady?: () => void;
 }
 
 /* ------------------------------------------------------- world dimensions */
@@ -65,7 +67,6 @@ const ROAD_HALF_W = 4.0;        // half road width in metres
 const LANE_W = 2.0;             // one lane
 const ROAD_LEN = 260;           // how much road is drawn ahead
 const DASH_PERIOD = 6;          // metres between centre-line dashes
-const DASH_COUNT = Math.floor(ROAD_LEN / DASH_PERIOD);
 
 const CAM_HEIGHT = 2.6;         // metres above the road
 const CAM_BACK = 8.2;           // metres behind the car centre
@@ -74,6 +75,22 @@ const CAM_LOOK_Y = 2.4;         // aim ABOVE the car so the car reads low in fra
 
 /** Real-world metres per track unit. */
 const METRES_PER_SEGMENT = 1 / SEGMENT_LENGTH;
+
+interface QualityProfile {
+  dpr: number;
+  roadDashes: number;
+  scenery: number;
+  streaks: number;
+  shadows: boolean;
+  shadowMap: number;
+  fps: number;
+}
+
+const QUALITY: Record<GraphicsQuality, QualityProfile> = {
+  low: { dpr: 1, roadDashes: 24, scenery: 18, streaks: 12, shadows: false, shadowMap: 0, fps: 30 },
+  medium: { dpr: 1.25, roadDashes: 32, scenery: 30, streaks: 20, shadows: true, shadowMap: 512, fps: 60 },
+  high: { dpr: 1.5, roadDashes: 43, scenery: 46, streaks: 30, shadows: true, shadowMap: 1024, fps: 60 },
+};
 
 /* ------------------------------------------------------------ tiny helpers */
 
@@ -91,7 +108,7 @@ function hash01(n: number): number {
  * toward the camera and wrap, and a subtle texture-less sheen is not used at
  * all — the moving dashes plus the speed streaks are what sell velocity.
  */
-function Road({ engineRef, env }: { engineRef: EngineHandle; env: EnvPalette }) {
+function Road({ engineRef, env, quality }: { engineRef: EngineHandle; env: EnvPalette; quality: QualityProfile }) {
   const dashes = useRef<(THREE.Mesh | null)[]>([]);
   const travelled = useRef(0);
 
@@ -135,8 +152,8 @@ function Road({ engineRef, env }: { engineRef: EngineHandle; env: EnvPalette }) 
       if (!m) return;
       const base = -(i * DASH_PERIOD);
       let z = base + offset;
-      // wrap into (-DASH_PERIOD*DASH_COUNT, 0]
-      if (z > 0) z -= DASH_PERIOD * DASH_COUNT;
+      // Keep the finite marking pool moving through the visible road.
+      if (z > 0) z -= ROAD_LEN;
       m.position.z = z;
     });
   });
@@ -163,16 +180,16 @@ function Road({ engineRef, env }: { engineRef: EngineHandle; env: EnvPalette }) 
 
       {/* dashed lane markings down the two inner lane separators */}
       {[-LANE_W, LANE_W].map((lx) =>
-        Array.from({ length: DASH_COUNT }).map((_, i) => (
+        Array.from({ length: quality.roadDashes }).map((_, i) => (
           <mesh
             key={`${lx}-${i}`}
             ref={(m) => {
-              if (m) dashes.current[lx < 0 ? i : DASH_COUNT + i] = m;
+              if (m) dashes.current[lx < 0 ? i : quality.roadDashes + i] = m;
             }}
             geometry={dashGeo}
             material={dashMat}
             rotation={[-Math.PI / 2, 0, 0]}
-            position={[lx, 0.03, -i * DASH_PERIOD]}
+            position={[lx, 0.03, -(i * ROAD_LEN / quality.roadDashes)]}
           />
         )),
       )}
@@ -183,8 +200,8 @@ function Road({ engineRef, env }: { engineRef: EngineHandle; env: EnvPalette }) 
 /* --------------------------------------------------------------- scenery */
 
 /** Roadside buildings on both sides, plus a fogged horizon plane. */
-function Scenery({ env }: { env: EnvPalette }) {
-  const COUNT = 46;
+function Scenery({ env, quality }: { env: EnvPalette; quality: QualityProfile }) {
+  const COUNT = quality.scenery;
 
   const boxGeo = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
   const wallMat = useMemo(
@@ -237,8 +254,8 @@ function Scenery({ env }: { env: EnvPalette }) {
 /* --------------------------------------------------------- road streaks */
 
 /** Short ground streaks that rush past to reinforce speed. */
-function SpeedStreaks({ engineRef, env }: { engineRef: EngineHandle; env: EnvPalette }) {
-  const COUNT = 30;
+function SpeedStreaks({ engineRef, env, quality }: { engineRef: EngineHandle; env: EnvPalette; quality: QualityProfile }) {
+  const COUNT = quality.streaks;
   const items = useRef<(THREE.Mesh | null)[]>([]);
   const travel = useRef(0);
 
@@ -291,13 +308,23 @@ function SpeedStreaks({ engineRef, env }: { engineRef: EngineHandle; env: EnvPal
 
 /* ------------------------------------------------------------------ world */
 
-function World({ engineRef, playerBuild, env, opponentBuilds }: RaceScene3DProps) {
+function World({ engineRef, playerBuild, env, opponentBuilds, quality: qualityId, onReady }: RaceScene3DProps) {
+  const quality = QUALITY[qualityId];
   const { camera } = useThree();
   const playerGroup = useRef<THREE.Group>(null);
   const oppGroups = useRef<(THREE.Group | null)[]>([]);
   const rollRef = useRef(0);
   const bendRef = useRef(0);
   const worldRef = useRef<THREE.Group>(null);
+  const [carsReady, setCarsReady] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setCarsReady(true);
+      onReady?.();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [onReady]);
 
   // Lanes (metres) for the three rivals, matching the track's LANE_X spread.
   const oppLanes = useMemo(() => [-3.0, 0, 3.0], []);
@@ -372,9 +399,9 @@ function World({ engineRef, playerBuild, env, opponentBuilds }: RaceScene3DProps
       <directionalLight
         position={[12, 26, 14]}
         intensity={2.2}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        castShadow={quality.shadows}
+        shadow-mapSize-width={quality.shadowMap}
+        shadow-mapSize-height={quality.shadowMap}
         shadow-camera-near={1}
         shadow-camera-far={90}
         shadow-camera-left={-16}
@@ -391,12 +418,12 @@ function World({ engineRef, playerBuild, env, opponentBuilds }: RaceScene3DProps
         <meshStandardMaterial color={env.ground[0]} roughness={1} />
       </mesh>
 
-      <Road engineRef={engineRef} env={env} />
-      <Scenery env={env} />
-      <SpeedStreaks engineRef={engineRef} env={env} />
+      <Road engineRef={engineRef} env={env} quality={quality} />
+      <Scenery env={env} quality={quality} />
+      <SpeedStreaks engineRef={engineRef} env={env} quality={quality} />
 
       {/* the player's car — real model-specific geometry, facing away from camera */}
-      <group ref={playerGroup} position={[0, 0.02, 0]}>
+      {carsReady && <group ref={playerGroup} position={[0, 0.02, 0]}>
         <CarModel3D
           build={playerBuild}
           position={[0, 0, 0]}
@@ -405,10 +432,10 @@ function World({ engineRef, playerBuild, env, opponentBuilds }: RaceScene3DProps
           float={false}
           braking={false}
         />
-      </group>
+      </group>}
 
       {/* rivals — real model-specific geometry */}
-      {opponentBuilds.map((b, i) => (
+      {carsReady && opponentBuilds.map((b, i) => (
         <group
           key={i}
           ref={(g) => {
@@ -432,18 +459,42 @@ function World({ engineRef, playerBuild, env, opponentBuilds }: RaceScene3DProps
 /* --------------------------------------------------------------- exported */
 
 export function RaceScene3D(props: RaceScene3DProps) {
+  const quality = QUALITY[props.quality];
   return (
     <Canvas
-      shadows
+      frameloop={props.quality === "low" ? "never" : "always"}
+      shadows={quality.shadows}
       gl={{ antialias: true, powerPreference: "high-performance" }}
-      dpr={[1, 1.5]}
+      dpr={quality.dpr}
       camera={{ fov: 48, near: 0.3, far: 700, position: [0, CAM_HEIGHT, CAM_BACK] }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 1.05;
       }}
     >
+      {props.quality === "low" && <FrameDriver fps={quality.fps} />}
       <World {...props} />
     </Canvas>
   );
+}
+
+function FrameDriver({ fps }: { fps: number }) {
+  const invalidate = useThree((state) => state.invalidate);
+
+  useEffect(() => {
+    let raf = 0;
+    let last = 0;
+    const interval = 1000 / fps;
+    const tick = (now: number) => {
+      if (now - last >= interval) {
+        last = now;
+        invalidate();
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    raf = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(raf);
+  }, [fps, invalidate]);
+
+  return null;
 }

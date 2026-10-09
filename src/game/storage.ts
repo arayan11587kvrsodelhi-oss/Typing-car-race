@@ -1,5 +1,5 @@
 import { migrateCarId } from "./cars";
-import type { Difficulty, EnvironmentId, GameModeId, Profile, RaceDistance, ScoreEntry } from "./types";
+import type { Difficulty, EnvironmentId, GameModeId, GraphicsQuality, Profile, RaceDistance, ScoreEntry } from "./types";
 
 const KEY_PROFILE = "typedrift.profile.v1";
 const KEY_SCORES = "typedrift.scores.v1";
@@ -15,9 +15,17 @@ export interface Settings {
   timeOfDay?: string;
   camera?: string;
   reducedMotion?: boolean;
+  graphicsQuality: GraphicsQuality;
 }
 
-const DEFAULT_SETTINGS: Settings = { muted: false, difficulty: "rookie", distance: "circuit", environment: "night", mode: "quick" };
+const DEFAULT_SETTINGS: Settings = {
+  muted: false,
+  difficulty: "rookie",
+  distance: "circuit",
+  environment: "night",
+  mode: "quick",
+  graphicsQuality: "low",
+};
 
 function safeParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback;
@@ -105,7 +113,11 @@ export function clearScores() {
 }
 
 export function loadSettings(): Settings {
-  return safeParse<Settings>(localStorage.getItem(KEY_SETTINGS), DEFAULT_SETTINGS);
+  const settings = safeParse<Settings>(localStorage.getItem(KEY_SETTINGS), DEFAULT_SETTINGS);
+  if (settings.graphicsQuality !== "low" && settings.graphicsQuality !== "medium" && settings.graphicsQuality !== "high") {
+    settings.graphicsQuality = DEFAULT_SETTINGS.graphicsQuality;
+  }
+  return settings;
 }
 
 export function saveSettings(s: Settings) {
