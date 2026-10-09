@@ -1,4 +1,5 @@
 import { cn } from "@/utils/cn";
+import { MobileKeyboard } from "./MobileKeyboard";
 
 interface TypingPanelProps {
   target: string;
@@ -14,6 +15,8 @@ interface TypingPanelProps {
   running: boolean;
   onNitro: () => void;
   onFocusRequest: () => void;
+  onVirtualKey: (value: string) => void;
+  onVirtualBackspace: () => void;
 }
 
 export function TypingPanel({
@@ -30,6 +33,8 @@ export function TypingPanel({
   running,
   onNitro,
   onFocusRequest,
+  onVirtualKey,
+  onVirtualBackspace,
 }: TypingPanelProps) {
   const characters = Array.from(target);
   const progress = characters.length
@@ -38,8 +43,8 @@ export function TypingPanel({
 
   return (
     <section
-      className="relative z-20 w-full shrink-0 border-t border-white/10 bg-[#080b12]/95 px-4 py-4 sm:px-8 sm:py-5"
-      onPointerDown={onFocusRequest}
+      className="race-typing-panel relative z-20 w-full shrink-0 border-t border-white/10 bg-[#080b12]/95 px-4 py-4 sm:px-8 sm:py-5"
+      onPointerDown={() => !isTouch && onFocusRequest()}
       aria-label="Race typing panel"
     >
       <div className="mx-auto w-full max-w-5xl">
@@ -88,13 +93,13 @@ export function TypingPanel({
         <div
           key={shakeKey}
           className={cn(
-            "rounded-xl border p-4 transition-colors sm:p-5",
+            "rounded-xl border p-3 transition-colors sm:p-5",
             inputFocused
               ? "border-cyan-400/40 bg-cyan-400/[0.04]"
               : "border-white/10 bg-white/[0.02]",
             shakeKey > 0 && "animate-[shake_180ms_ease-in-out]"
           )}
-          onClick={onFocusRequest}
+          onClick={() => !isTouch && onFocusRequest()}
         >
           <div
             className="break-words font-mono text-base leading-relaxed tracking-wide sm:text-xl md:text-2xl"
@@ -132,6 +137,16 @@ export function TypingPanel({
             })}
           </div>
 
+          {isTouch && (
+            <MobileKeyboard
+              target={target}
+              typed={typed}
+              running={running}
+              onKey={onVirtualKey}
+              onBackspace={onVirtualBackspace}
+            />
+          )}
+
           {next && (
             <div className="mt-3 truncate border-t border-white/5 pt-3 text-xs text-slate-500 sm:text-sm">
               NEXT: <span className="text-slate-400">{next}</span>
@@ -139,22 +154,24 @@ export function TypingPanel({
           )}
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3 text-[10px] uppercase tracking-widest text-slate-500 sm:text-xs">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-widest text-slate-500 sm:text-xs">
           <span>
             {isTouch
               ? "Tap the sentence to type"
               : "Type to accelerate"}
           </span>
 
-          <span className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-2">
             <span
               className={cn(
                 "h-1.5 w-1.5 rounded-full",
                 inputFocused ? "bg-emerald-400" : "bg-slate-600"
               )}
             />
-            {inputFocused ? "Input ready" : "Click to focus"}
-          </span>
+            {isTouch ? "Keyboard ready" : inputFocused ? "Input ready" : "Click to focus"}
+            </span>
+          </div>
         </div>
 
         <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/5">

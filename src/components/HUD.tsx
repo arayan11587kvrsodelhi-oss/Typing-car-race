@@ -288,12 +288,12 @@ export const HUD = memo(function HUD({
       </div>
 
       {/* bottom gauges */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 [@media(max-height:420px)]:hidden">
-        <div className="w-[88px] h-[88px] sm:w-[128px] sm:h-[128px] lg:w-[144px] lg:h-[144px] tilt-left flex-shrink-0">
+      <div className="grid grid-cols-2 items-center justify-between gap-2 sm:flex sm:flex-row sm:gap-4 [@media(max-height:420px)]:hidden">
+        <div className="hidden h-[88px] w-[88px] shrink-0 tilt-left sm:block sm:h-[128px] sm:w-[128px] lg:h-[144px] lg:w-[144px]">
           <Speedo mph={hud.mph} nitro={hud.nitroActive} />
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 flex-1 min-w-0">
+        <div className="col-span-2 grid min-w-0 grid-cols-3 items-center justify-center gap-1 sm:flex sm:flex-1 sm:gap-3">
           <GaugePanel
             label="Avg WPM"
             value={Math.round(hud.wpm)}
@@ -315,7 +315,7 @@ export const HUD = memo(function HUD({
           />
         </div>
 
-        <div className="glass rounded-xl px-4 py-3 sm:px-5 sm:py-3 text-right tilt-right min-w-[100px] sm:min-w-[130px] flex-shrink-0">
+        <div className="glass rounded-xl px-2 py-2 text-right tilt-right sm:min-w-[130px] sm:px-5 sm:py-3">
           <div className="text-[8px] sm:text-[9px] font-display uppercase tracking-[0.2em] text-amber-300/80 mb-1">Score</div>
           <div className="font-display font-black text-2xl sm:text-3xl lg:text-4xl leading-none text-amber-200 tabular-nums neon-text">
             {hud.score.toLocaleString()}

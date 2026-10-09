@@ -36,9 +36,9 @@ export function Garage({ profile, onProfile, onBack, onRace, onQA }: Props) {
   };
   const go = (p: typeof preset) => { setPreset(p); setReq((n) => n + 1); audio.play("click"); };
   return (
-    <div className="h-full w-full overflow-y-auto bg-[#05070d] text-slate-100">
+    <div className="h-full w-full overflow-y-auto overscroll-contain bg-[#05070d] pb-safe text-slate-100">
       <div className="mx-auto max-w-[1500px] px-3 py-3 sm:px-6">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Button variant="ghost" onClick={onBack}>Back</Button>
           <div className="text-right"><div className="text-[10px] uppercase tracking-[0.3em] text-cyan-300/70">{def.manufacturer} · {def.class}</div><div className="font-display text-xl font-black sm:text-3xl">{def.fullName}</div></div>
           <div className="glass rounded-xl px-3 py-1 text-amber-300 font-bold">{profile.credits.toLocaleString()} CR</div>
@@ -53,14 +53,14 @@ export function Garage({ profile, onProfile, onBack, onRace, onQA }: Props) {
             <Button variant="primary" onClick={onRace} className="mt-2 w-full">Race</Button>
             {onQA && <Button variant="secondary" onClick={onQA} className="mt-2 w-full text-cyan-300 border-cyan-400/40">🏎️ Compare silhouettes</Button>}
           </div>
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black min-h-[420px] sm:min-h-[520px]">
+          <div className="relative min-h-[300px] overflow-hidden rounded-2xl border border-white/10 bg-black sm:min-h-[520px]">
             <CarViewer3D build={build} garageId={garageId} autoRotate={auto} inspectPart={inspect} request={{ preset, nonce: req }} />
             <div className="absolute left-2 top-2 flex flex-wrap gap-1">
-              {(["rear","left","right","top","cockpit","reset"] as const).map((p) => (<button key={p} onClick={() => go(p)} className="rounded-md border border-white/15 bg-black/60 px-2 py-1 text-[10px] uppercase tracking-widest text-slate-200 backdrop-blur hover:border-cyan-300">{p}</button>))}
+              {(["rear","left","right","top","cockpit","reset"] as const).map((p) => (<button key={p} onClick={() => go(p)} className="touch-target rounded-md border border-white/15 bg-black/60 px-2 py-1 text-[10px] uppercase tracking-widest text-slate-200 backdrop-blur hover:border-cyan-300">{p}</button>))}
             </div>
             <div className="absolute right-2 top-2 flex gap-1">
-              <button onClick={() => setAuto((a) => !a)} className={cn("rounded-md border px-2 py-1 text-[10px] uppercase tracking-widest backdrop-blur", auto ? "border-cyan-300 bg-cyan-400/20 text-cyan-100" : "border-white/15 bg-black/60 text-slate-300")}>{auto ? "Auto on" : "Auto off"}</button>
-              <button onClick={() => setInspect((v) => (v ? null : "wheels"))} className="rounded-md border border-white/15 bg-black/60 px-2 py-1 text-[10px] uppercase tracking-widest text-slate-200">Inspect</button>
+              <button onClick={() => setAuto((a) => !a)} className={cn("touch-target rounded-md border px-2 py-1 text-[10px] uppercase tracking-widest backdrop-blur", auto ? "border-cyan-300 bg-cyan-400/20 text-cyan-100" : "border-white/15 bg-black/60 text-slate-300")}>{auto ? "Auto on" : "Auto off"}</button>
+              <button onClick={() => setInspect((v) => (v ? null : "wheels"))} className="touch-target rounded-md border border-white/15 bg-black/60 px-2 py-1 text-[10px] uppercase tracking-widest text-slate-200">Inspect</button>
             </div>
             {inspect && <div className="absolute left-2 bottom-2 max-w-[240px] rounded-xl border border-cyan-300/40 bg-black/70 p-2 text-[11px] text-cyan-100">Inspecting {inspect} equipment.</div>}
             {toast && <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/70 px-3 py-1 text-xs">{toast}</div>}

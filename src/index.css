@@ -359,8 +359,8 @@ canvas {
 
 .hidden-input {
   position: fixed;
-  left: 0;
-  top: 0;
+  left: 50%;
+  top: 100%;
   width: 1px;
   height: 1px;
   opacity: 0.01;
@@ -371,6 +371,26 @@ canvas {
   color: transparent;
   caret-color: transparent;
   pointer-events: none;
+}
+
+button,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  button:not(.compact-target),
+  [role="button"]:not(.compact-target) {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 639px) {
+  .race-typing-panel {
+    max-height: 42vh;
+    overflow-y: auto;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
 }
 
 .text-gradient {

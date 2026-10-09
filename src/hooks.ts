@@ -37,6 +37,11 @@ export function useIsTouch() {
 export function useCountUp(target: number, duration = 900, delay = 0) {
   const [value, setValue] = useState(0);
   useEffect(() => {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion) {
+      setValue(target);
+      return;
+    }
     let raf = 0;
     let start = 0;
     const timer = window.setTimeout(() => {

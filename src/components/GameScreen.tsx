@@ -202,6 +202,8 @@ export function GameScreen({
 
     if (!isTouch) {
       focusInput();
+    } else {
+      inputRef.current?.blur();
     }
 
     const handleEvent = (event: GameEvent) => {
@@ -542,6 +544,18 @@ export function GameScreen({
     focusInput();
   }, [focusInput]);
 
+  const handleVirtualKey = useCallback((value: string) => {
+    const engine = engineRef.current;
+    if (!engine || engine.state !== "running") return;
+    engine.typeChar(value);
+  }, []);
+
+  const handleVirtualBackspace = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine || engine.state !== "running") return;
+    engine.backspace();
+  }, []);
+
   const playerColor = config.build.custom.paint;
   const paused = gameState === "paused";
 
@@ -555,7 +569,7 @@ export function GameScreen({
       <div
         ref={stageRef}
         className="relative flex-1 min-h-0 overflow-hidden"
-        onPointerDown={focusInput}
+        onPointerDown={() => !isTouch && focusInput()}
       >
         {/* The race canvas reads engine state each frame; the update loop above
             remains the single authoritative simulation. */}
@@ -688,7 +702,11 @@ export function GameScreen({
             gameState === "running" || gameState === "countdown"
           }
           onNitro={handleNitro}
-          onFocusRequest={focusInput}
+          onFocusRequest={() => {
+            if (!isTouch) focusInput();
+          }}
+          onVirtualKey={handleVirtualKey}
+          onVirtualBackspace={handleVirtualBackspace}
         />
       )}
 
@@ -702,6 +720,7 @@ export function GameScreen({
         spellCheck={false}
         inputMode="text"
         enterKeyHint="go"
+        tabIndex={isTouch ? -1 : 0}
         aria-label="Typing input"
         onInput={onInput}
         onFocus={() => setInputFocused(true)}
