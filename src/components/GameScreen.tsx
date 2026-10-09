@@ -20,6 +20,7 @@ interface Props {
   onRestart: () => void;
   onGarage: () => void;
   onExit: () => void;
+  onMap: () => void;
   onNextLevel: (levelId: string) => void;
 }
 
@@ -99,6 +100,7 @@ export function GameScreen({
   onRestart,
   onGarage,
   onExit,
+  onMap,
   onNextLevel,
 }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
@@ -664,6 +666,7 @@ export function GameScreen({
             onRestart={() => callbacks.current.onRestart()}
             onGarage={() => callbacks.current.onGarage()}
             onExit={() => callbacks.current.onExit()}
+            onMap={onMap}
             onNextLevel={onNextLevel}
           />
         )}

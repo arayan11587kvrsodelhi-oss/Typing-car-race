@@ -23,6 +23,8 @@ export default function App() {
   const [lastScoreId, setLastScoreId] = useState<string | undefined>();
   const [campaign, setCampaign] = useState<CampaignProgress>(() => loadCampaignProgress());
   const [selectedLevelId, setSelectedLevelId] = useState(() => loadCampaignProgress().unlockedLevelIds[0] ?? defaultCampaignProgress().unlockedLevelIds[0]);
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
 
   const profileRef = useRef(profile);
   profileRef.current = profile;
@@ -32,6 +34,16 @@ export default function App() {
   useEffect(() => {
     audio.setMuted(settings.muted);
   }, [settings.muted]);
+
+  useEffect(() => {
+    window.history.replaceState({ screen: "menu" }, "", window.location.href);
+    const handlePopState = (event: PopStateEvent) => {
+      const nextScreen = event.state?.screen;
+      setScreen(nextScreen === "garage" || nextScreen === "scores" || nextScreen === "qa" ? nextScreen : "menu");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const setProfile = useCallback((p: Profile) => {
     profileRef.current = p;
@@ -67,6 +79,7 @@ export default function App() {
       mode: "career",
       seed: Math.floor(Math.random() * 1e9),
     });
+    window.history.pushState({ screen: "race" }, "", window.location.href);
     setScreen("race");
   }, [campaign, selectedLevelId]);
 
@@ -83,6 +96,7 @@ export default function App() {
       playerName: p.name || "ACE",
       seed: Math.floor(Math.random() * 1e9),
     });
+    window.history.pushState({ screen: "race" }, "", window.location.href);
     setScreen("race");
   }, []);
 
@@ -149,10 +163,15 @@ export default function App() {
     [campaign, raceConfig, setProfile],
   );
 
-  const goMenu = useCallback(() => setScreen("menu"), []);
-  const goGarage = useCallback(() => setScreen("garage"), []);
-  const goScores = useCallback(() => setScreen("scores"), []);
-  const goQA = useCallback(() => setScreen("qa"), []);
+  const navigateTo = useCallback((nextScreen: Exclude<Screen, "race">) => {
+    if (screenRef.current === nextScreen) return;
+    window.history.pushState({ screen: nextScreen }, "", window.location.href);
+    setScreen(nextScreen);
+  }, []);
+  const goMenu = useCallback(() => navigateTo("menu"), [navigateTo]);
+  const goGarage = useCallback(() => navigateTo("garage"), [navigateTo]);
+  const goScores = useCallback(() => navigateTo("scores"), [navigateTo]);
+  const goQA = useCallback(() => navigateTo("qa"), [navigateTo]);
   const toggleMute = useCallback(() => updateSettings({ muted: !settingsRef.current.muted }), [updateSettings]);
 
   return (
@@ -192,6 +211,7 @@ export default function App() {
               playerName: nextProf.name || "ACE",
               seed: Math.floor(Math.random() * 1e9),
             });
+            window.history.pushState({ screen: "race" }, "", window.location.href);
             setScreen("race");
           }}
         />
@@ -206,6 +226,7 @@ export default function App() {
           onRestart={restartRace}
           onGarage={goGarage}
           onExit={goMenu}
+          onMap={goMenu}
           onNextLevel={(levelId) => startRace(levelId)}
         />
       )}

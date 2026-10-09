@@ -19,7 +19,7 @@ function Stat({ label, value, suffix = "", accent, delay }: { label: string; val
   );
 }
 
-export function ResultsOverlay({ result, carName, isTouch, onRestart, onGarage, onExit, onNextLevel }: { result: RaceResult; carName: string; isTouch: boolean; onRestart: () => void; onGarage: () => void; onExit: () => void; onNextLevel: (levelId: string) => void }) {
+export function ResultsOverlay({ result, carName, isTouch, onRestart, onGarage, onExit, onMap, onNextLevel }: { result: RaceResult; carName: string; isTouch: boolean; onRestart: () => void; onGarage: () => void; onExit: () => void; onMap: () => void; onNextLevel: (levelId: string) => void }) {
   const first = result.place === 1 && !result.dnf;
   const score = useCountUp(result.score, 1200, 350);
   return (
@@ -89,6 +89,9 @@ export function ResultsOverlay({ result, carName, isTouch, onRestart, onGarage, 
           </Button>
           <Button variant="secondary" size="lg" onClick={onGarage}>
             Garage
+          </Button>
+          <Button variant="secondary" size="lg" onClick={onMap}>
+            Back to map
           </Button>
           <Button variant="ghost" size="lg" onClick={onExit}>
             Menu

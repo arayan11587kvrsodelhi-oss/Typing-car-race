@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   LEVELS,
+  CAMPAIGN_WORLDS,
   canStartLevel,
   completeLevel,
   defaultCampaignProgress,
   isLevelUnlocked,
+  isWorldUnlocked,
+  levelsForWorld,
   normalizeCampaignProgress,
   qualifiesLevel,
 } from "./levels";
@@ -64,4 +67,32 @@ test("malformed progress is normalized safely", () => {
   assert.equal(progress.unlockedLevelIds.includes(LEVELS[0].id), true);
   assert.equal(progress.unlockedLevelIds.includes(LEVELS[3].id), true);
   assert.deepEqual(progress.rewardsClaimed, []);
+});
+
+test("campaign worlds contain exactly their assigned four levels", () => {
+  assert.deepEqual(CAMPAIGN_WORLDS.map((world) => levelsForWorld(world).map((level) => level.index)), [
+    [1, 2, 3, 4],
+    [5, 6, 7, 8],
+    [9, 10, 11, 12],
+  ]);
+});
+
+test("worlds unlock from existing completed campaign progress", () => {
+  const fresh = defaultCampaignProgress();
+  assert.equal(isWorldUnlocked(fresh, CAMPAIGN_WORLDS[0]), true);
+  assert.equal(isWorldUnlocked(fresh, CAMPAIGN_WORLDS[1]), false);
+  assert.equal(isWorldUnlocked(fresh, CAMPAIGN_WORLDS[2]), false);
+
+  const levelFour = completeLevel(
+    completeLevel(
+      completeLevel(
+        completeLevel(fresh, LEVELS[0], { wpm: 30, accuracy: 95, dnf: false, place: 1, score: 1000 }),
+        LEVELS[1], { wpm: 30, accuracy: 95, dnf: false, place: 1, score: 1000 },
+      ),
+      LEVELS[2], { wpm: 30, accuracy: 95, dnf: false, place: 1, score: 1000 },
+    ),
+    LEVELS[3], { wpm: 30, accuracy: 95, dnf: false, place: 1, score: 1000 },
+  );
+  assert.equal(isWorldUnlocked(levelFour, CAMPAIGN_WORLDS[1]), true);
+  assert.equal(isWorldUnlocked(levelFour, CAMPAIGN_WORLDS[2]), false);
 });
