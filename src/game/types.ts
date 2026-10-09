@@ -222,6 +222,12 @@ export interface RaceResult {
   dnf: boolean;
   isHighScore: boolean;
   rank: number;
+  campaign?: {
+    levelId: string;
+    qualified: boolean;
+    reward: number;
+    unlockedLevelId?: string;
+  };
 }
 
 export type GameEventType =

@@ -19,7 +19,7 @@ function Stat({ label, value, suffix = "", accent, delay }: { label: string; val
   );
 }
 
-export function ResultsOverlay({ result, carName, isTouch, onRestart, onGarage, onExit }: { result: RaceResult; carName: string; isTouch: boolean; onRestart: () => void; onGarage: () => void; onExit: () => void }) {
+export function ResultsOverlay({ result, carName, isTouch, onRestart, onGarage, onExit, onNextLevel }: { result: RaceResult; carName: string; isTouch: boolean; onRestart: () => void; onGarage: () => void; onExit: () => void; onNextLevel: (levelId: string) => void }) {
   const first = result.place === 1 && !result.dnf;
   const score = useCountUp(result.score, 1200, 350);
   return (
@@ -60,9 +60,31 @@ export function ResultsOverlay({ result, carName, isTouch, onRestart, onGarage, 
           </span>
           <span className="font-display font-black text-lg sm:text-2xl text-amber-300">+{result.credits.toLocaleString()} CR</span>
         </div>
+        {result.campaign && (
+          <div className={cn(
+            "relative mt-3 rounded-xl border px-4 py-3 text-center",
+            result.campaign.qualified
+              ? "border-emerald-300/35 bg-emerald-400/10"
+              : "border-rose-300/30 bg-rose-400/10",
+          )}>
+            <div className="font-display text-xs uppercase tracking-[0.25em] text-white">
+              {result.campaign.qualified ? "Level complete" : "Requirement not met"}
+            </div>
+            <div className="mt-1 text-xs text-slate-300">
+              {result.campaign.qualified
+                ? `+${result.campaign.reward} campaign credits${result.campaign.unlockedLevelId ? " · Next level unlocked" : ""}`
+                : "Improve your WPM and accuracy to unlock the next level."}
+            </div>
+          </div>
+        )}
 
         <div className="relative mt-4 sm:mt-6 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-          <Button variant="primary" size="lg" onClick={onRestart} className="sm:col-span-1">
+          {result.campaign?.unlockedLevelId && (
+            <Button variant="primary" size="lg" onClick={() => onNextLevel(result.campaign!.unlockedLevelId!)} className="sm:col-span-1">
+              Next level
+            </Button>
+          )}
+          <Button variant={result.campaign?.unlockedLevelId ? "secondary" : "primary"} size="lg" onClick={onRestart} className="sm:col-span-1">
             Race again {!isTouch && <Kbd>↵</Kbd>}
           </Button>
           <Button variant="secondary" size="lg" onClick={onGarage}>

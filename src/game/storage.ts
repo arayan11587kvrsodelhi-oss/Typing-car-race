@@ -1,9 +1,11 @@
 import { migrateCarId } from "./cars";
+import { defaultCampaignProgress, normalizeCampaignProgress, type CampaignProgress } from "./levels";
 import type { Difficulty, EnvironmentId, GameModeId, GraphicsQuality, Profile, RaceDistance, ScoreEntry } from "./types";
 
 const KEY_PROFILE = "typedrift.profile.v1";
 const KEY_SCORES = "typedrift.scores.v1";
 const KEY_SETTINGS = "typedrift.settings.v1";
+const KEY_CAMPAIGN = "typedrift.campaign.v1";
 
 export interface Settings {
   muted: boolean;
@@ -125,5 +127,21 @@ export function saveSettings(s: Settings) {
     localStorage.setItem(KEY_SETTINGS, JSON.stringify(s));
   } catch {
     /* ignore */
+  }
+}
+
+export function loadCampaignProgress(): CampaignProgress {
+  try {
+    return normalizeCampaignProgress(JSON.parse(localStorage.getItem(KEY_CAMPAIGN) ?? "null"));
+  } catch {
+    return defaultCampaignProgress();
+  }
+}
+
+export function saveCampaignProgress(progress: CampaignProgress) {
+  try {
+    localStorage.setItem(KEY_CAMPAIGN, JSON.stringify(normalizeCampaignProgress(progress)));
+  } catch {
+    // Campaign progress is best-effort, matching the existing local storage behavior.
   }
 }

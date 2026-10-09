@@ -6,6 +6,8 @@ import { StartScreen } from "./components/StartScreen";
 import { audio } from "./game/audio";
 import { buildFromProfile } from "./game/cars";
 import { loadProfile, loadScores, loadSettings, saveProfile, saveSettings, submitScore, type Settings } from "./game/storage";
+import { loadCampaignProgress, saveCampaignProgress } from "./game/storage";
+import { completeLevel, defaultCampaignProgress, isLevelUnlocked, levelById, type CampaignProgress } from "./game/levels";
 import type { Profile, RaceConfig, RaceResult, ScoreEntry } from "./game/types";
 
 import { QAComparisonView } from "./components/qa/QAComparisonView";
@@ -19,6 +21,8 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("menu");
   const [raceConfig, setRaceConfig] = useState<RaceConfig | null>(null);
   const [lastScoreId, setLastScoreId] = useState<string | undefined>();
+  const [campaign, setCampaign] = useState<CampaignProgress>(() => loadCampaignProgress());
+  const [selectedLevelId, setSelectedLevelId] = useState(() => loadCampaignProgress().unlockedLevelIds[0] ?? defaultCampaignProgress().unlockedLevelIds[0]);
 
   const profileRef = useRef(profile);
   profileRef.current = profile;
@@ -44,7 +48,29 @@ export default function App() {
 
   const build = useMemo(() => buildFromProfile(profile), [profile]);
 
-  const startRace = useCallback(() => {
+  const startRace = useCallback((requestedLevelId = selectedLevelId) => {
+    audio.init();
+    const p = profileRef.current;
+    const s = settingsRef.current;
+    const level = levelById(requestedLevelId);
+    const currentCampaign = campaign;
+    if (!isLevelUnlocked(currentCampaign, level.id)) return;
+    setSelectedLevelId(level.id);
+    setRaceConfig({
+      build: buildFromProfile(p),
+      difficulty: level.difficulty,
+      distance: level.distance,
+      environment: level.environment,
+      graphicsQuality: s.graphicsQuality,
+      playerName: p.name || "ACE",
+      levelId: level.id,
+      mode: "career",
+      seed: Math.floor(Math.random() * 1e9),
+    });
+    setScreen("race");
+  }, [campaign, selectedLevelId]);
+
+  const startQuickRace = useCallback(() => {
     audio.init();
     const p = profileRef.current;
     const s = settingsRef.current;
@@ -84,15 +110,43 @@ export default function App() {
       const rank = submitScore(entry);
       setScores(loadScores());
       setLastScoreId(entry.id);
+      let nextCampaign = campaign;
+      const levelId = cfg?.levelId;
+      const level = levelId ? levelById(levelId) : undefined;
+      let campaignResult: RaceResult["campaign"];
+      if (level) {
+        const qualified = !result.dnf && result.wpm >= level.targetWpm && result.accuracy >= level.minimumAccuracy;
+        if (qualified) {
+          const rewardAlreadyClaimed = nextCampaign.rewardsClaimed.includes(level.id);
+          nextCampaign = completeLevel(nextCampaign, level, {
+            wpm: result.wpm,
+            accuracy: result.accuracy,
+            dnf: result.dnf,
+            place: result.place,
+            score: result.score,
+          });
+          setCampaign(nextCampaign);
+          saveCampaignProgress(nextCampaign);
+          const next = nextCampaign.unlockedLevelIds.find((id) => levelById(id).index === level.index + 1);
+          campaignResult = {
+            levelId: level.id,
+            qualified: true,
+            reward: rewardAlreadyClaimed ? 0 : level.reward,
+            unlockedLevelId: rewardAlreadyClaimed ? undefined : next,
+          };
+        } else {
+          campaignResult = { levelId: level.id, qualified: false, reward: 0 };
+        }
+      }
       setProfile({
         ...p,
-        credits: p.credits + result.credits,
+        credits: p.credits + result.credits + (campaignResult?.reward ?? 0),
         racesPlayed: p.racesPlayed + 1,
         bestWpm: Math.max(p.bestWpm, result.wpm),
       });
-      return { ...result, rank, isHighScore: rank > 0 };
+      return { ...result, rank, isHighScore: rank > 0, campaign: campaignResult };
     },
-    [raceConfig, setProfile],
+    [campaign, raceConfig, setProfile],
   );
 
   const goMenu = useCallback(() => setScreen("menu"), []);
@@ -111,7 +165,11 @@ export default function App() {
           scores={scores}
           onSettings={updateSettings}
           onName={(name) => setProfile({ ...profileRef.current, name })}
+          campaign={campaign}
+          selectedLevelId={selectedLevelId}
+          onSelectLevel={(level) => setSelectedLevelId(level.id)}
           onStart={startRace}
+          onQuickRace={startQuickRace}
           onGarage={goGarage}
           onScores={goScores}
           onQA={goQA}
@@ -148,6 +206,7 @@ export default function App() {
           onRestart={restartRace}
           onGarage={goGarage}
           onExit={goMenu}
+          onNextLevel={(levelId) => startRace(levelId)}
         />
       )}
     </div>

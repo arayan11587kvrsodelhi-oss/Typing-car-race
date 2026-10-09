@@ -4,12 +4,14 @@ import { effectiveStats } from "@/game/cars";
 import { DIFFICULTY_BLURB, DIFFICULTY_LABEL } from "@/game/engine";
 import { ENV_LIST } from "@/game/environments";
 import type { Settings } from "@/game/storage";
+import { LEVELS, type CampaignProgress, type LevelDef } from "@/game/levels";
 import { DISTANCE_BLURB, DISTANCE_LABEL } from "@/game/track";
 import type { CarBuild, Difficulty, EnvironmentId, Profile, RaceConfig, RaceDistance, ScoreEntry } from "@/game/types";
 import { cn } from "@/utils/cn";
 import { CarPreview } from "./CarPreview";
 import { DemoBackground } from "./DemoBackground";
 import { Button, Kbd, Label, SegmentedControl, StatBar } from "./ui";
+import { CampaignMap } from "./CampaignMap";
 
 interface Props {
   profile: Profile;
@@ -18,7 +20,11 @@ interface Props {
   scores: ScoreEntry[];
   onSettings: (s: Partial<Settings>) => void;
   onName: (name: string) => void;
-  onStart: () => void;
+  campaign: CampaignProgress;
+  onSelectLevel: (level: LevelDef) => void;
+  selectedLevelId: string;
+  onStart: (levelId: string) => void;
+  onQuickRace: () => void;
   onGarage: () => void;
   onScores: () => void;
   onQA?: () => void;
@@ -55,7 +61,7 @@ const STAT_ICONS = {
   ),
 };
 
-export function StartScreen({ profile, settings, build, scores, onSettings, onName, onStart, onGarage, onScores, onQA }: Props) {
+export function StartScreen({ profile, settings, build, scores, campaign, selectedLevelId, onSelectLevel, onSettings, onName, onStart, onQuickRace, onGarage, onScores, onQA }: Props) {
   const demoConfig = useMemo<RaceConfig>(
     () => ({ build, difficulty: "pro", distance: "marathon", environment: settings.environment, playerName: profile.name, demo: true }),
     [build, settings.environment, profile.name],
@@ -68,12 +74,12 @@ export function StartScreen({ profile, settings, build, scores, onSettings, onNa
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Enter" && e.target === document.body) {
         e.preventDefault();
-        onStart();
+        onStart(selectedLevelId);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onStart]);
+  }, [onStart, selectedLevelId]);
 
   const handleEnvSelect = (envId: EnvironmentId) => {
     audio.play("click");
@@ -137,6 +143,12 @@ export function StartScreen({ profile, settings, build, scores, onSettings, onNa
           {/* body */}
           <div className="flex-1 grid lg:grid-cols-[1.15fr_1fr] gap-6 sm:gap-8 mt-4 items-start">
             <section className="glass rounded-3xl p-5 sm:p-7 animate-slide-up border border-white/5">
+              <CampaignMap
+                levels={LEVELS}
+                progress={campaign}
+                selectedId={selectedLevelId}
+                onSelect={onSelectLevel}
+              />
               <div className="grid sm:grid-cols-[1fr_auto] gap-4 items-end">
                 <div>
                   <Label className="mb-1.5 flex items-center gap-2">
@@ -250,7 +262,7 @@ export function StartScreen({ profile, settings, build, scores, onSettings, onNa
               </div>
 
               <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                <Button variant="primary" size="lg" onClick={onStart} className="flex-1 text-base sm:text-lg py-4.5 font-display relative overflow-hidden group">
+                <Button variant="primary" size="lg" onClick={() => onStart(selectedLevelId)} className="flex-1 text-base sm:text-lg py-4.5 font-display relative overflow-hidden group">
                   <span className="relative flex items-center justify-center gap-2">
                     <svg className="w-5 h-5 group-hover:animate-bounce-subtle transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -259,6 +271,9 @@ export function StartScreen({ profile, settings, build, scores, onSettings, onNa
                     <Kbd className="ml-1 hidden sm:inline-flex">↵</Kbd>
                   </span>
                   <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-fuchsia-400/20 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
+                </Button>
+                <Button variant="secondary" size="lg" onClick={onQuickRace} className="flex items-center justify-center gap-2">
+                  Quick race
                 </Button>
                 <Button variant="secondary" size="lg" onClick={onScores} className="flex items-center justify-center gap-2">
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
