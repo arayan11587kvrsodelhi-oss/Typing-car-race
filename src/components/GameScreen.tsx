@@ -1,15 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { audio } from "@/game/audio";
 import { GameEngine, type RaceState } from "@/game/engine";
-import { RIVALS, defaultCustomization } from "@/game/cars";
-import { envFor } from "@/game/environments";
-import type { CarBuild, GameEvent, RaceConfig, RaceResult } from "@/game/types";
+import type { GameEvent, RaceConfig, RaceResult } from "@/game/types";
 import { useIsTouch, useVisualViewportHeight } from "@/hooks";
 import { cn } from "@/utils/cn";
 
 import { HUD, type HudState } from "./HUD";
-import { RaceScene3D } from "./RaceScene3D";
+import { RaceScene2D } from "./RaceScene2D";
 import { ResultsOverlay } from "./ResultsOverlay";
 import TypingPanel from "./TypingPanel";
 import { Button, Kbd } from "./ui";
@@ -121,11 +119,9 @@ export function GameScreen({
   const [result, setResult] = useState<RaceResult | null>(null);
   const [inputFocused, setInputFocused] = useState(false);
 
-  // The 3D scene is mounted once the countdown ends — see the comment at the
-  // render site.  Mounting the four car models during the countdown starves
-  // the rAF loop that advances the simulation.
+  // Mount the race canvas once the countdown ends so backdrop construction
+  // cannot starve the simulation loop.
   const [sceneReady, setSceneReady] = useState(false);
-  const [sceneLoading, setSceneLoading] = useState(false);
 
   // Always use the latest callbacks without rebuilding the game loop.
   const callbacks = useRef({
@@ -184,7 +180,7 @@ export function GameScreen({
 
     let latestHud: HudState = EMPTY_HUD;
 
-    // Create the simulation once for this race configuration.  The 3D scene
+    // Create the simulation once for this race configuration. The race canvas
     // reads from this engine; it never advances it.
     const engine = new GameEngine(config);
 
@@ -199,7 +195,6 @@ export function GameScreen({
     setShowCount(true);
     setResult(null);
     setSceneReady(false);
-    setSceneLoading(false);
 
     audio.init();
 
@@ -318,10 +313,6 @@ export function GameScreen({
         engine.update(delta);
       }
 
-      // The 3D scene renders itself from engine state via its own useFrame.
-      // We deliberately do NOT advance the simulation there, so the engine
-      // remains the single authoritative update loop.
-
       // Process events after the simulation has advanced.
       const events = engine.drainEvents();
 
@@ -398,9 +389,8 @@ export function GameScreen({
         lastState = engine.state;
         setGameState(engine.state);
 
-        // Mount the 3D world as soon as the race leaves the countdown.
+        // Mount the race world as soon as the race leaves the countdown.
         if (engine.state === "running") setSceneReady(true);
-        if (engine.state === "running") setSceneLoading(true);
       }
     };
 
@@ -550,35 +540,8 @@ export function GameScreen({
     focusInput();
   }, [focusInput]);
 
-  const handleSceneReady = useCallback(() => {
-    setSceneLoading(false);
-  }, []);
-
   const playerColor = config.build.custom.paint;
   const paused = gameState === "paused";
-
-  // Environment palette for the 3D scene (derived from the race config).
-  const engineEnv = useMemo(
-    () => envFor(config.environment),
-    [config.environment],
-  );
-
-  // Opponent builds for the 3D scene.  Rivals share the player's upgrade level
-  // so their geometry matches what the garage would show for that model; their
-  // paint comes from the engine's own rival equipment so the HUD dots and the
-  // 3D cars always agree.
-  const opponentBuilds = useMemo<CarBuild[]>(() => {
-    const rivalDefs = RIVALS.filter((r) => r.def.id !== config.build.def.id).slice(0, 3);
-    return rivalDefs.map((r) => ({
-      def: r.def,
-      custom: {
-        ...defaultCustomization(r.def),
-        paint: r.paint,
-      },
-      upgrades: { ...config.build.upgrades },
-      plate: r.name.toUpperCase().slice(0, 7),
-    }));
-  }, [config.build.def.id, config.build.upgrades]);
 
   return (
     <div
@@ -592,14 +555,8 @@ export function GameScreen({
         className="relative flex-1 min-h-0 overflow-hidden"
         onPointerDown={focusInput}
       >
-        {/* Real 3D racing scene.  Reads engine state each frame; the engine
-            update loop stays in the effect above (single authoritative loop).
-
-            The scene is mounted only once the countdown has finished.  Building
-            four full car models is heavy synchronous work, and mounting it while
-            the countdown is ticking starves the rAF loop that advances the race
-            (observed: the countdown froze at "3" for 25s).  Deferring keeps the
-            countdown and the typing panel responsive while the geometry builds. */}
+        {/* The race canvas reads engine state each frame; the update loop above
+            remains the single authoritative simulation. */}
         <div
           className={cn(
             "absolute inset-0 transition-[filter] duration-300",
@@ -607,24 +564,9 @@ export function GameScreen({
           )}
         >
           {sceneReady && (
-            <RaceScene3D
-              engineRef={engineRef}
-              playerBuild={config.build}
-              env={engineEnv}
-              opponentBuilds={opponentBuilds}
-              quality={config.graphicsQuality ?? "low"}
-              onReady={handleSceneReady}
-            />
+            <RaceScene2D engineRef={engineRef} />
           )}
         </div>
-
-        {sceneLoading && sceneReady && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="rounded-full border border-cyan-300/30 bg-slate-950/70 px-4 py-2 font-display text-[10px] uppercase tracking-[0.25em] text-cyan-100/80">
-              Preparing race scene
-            </div>
-          </div>
-        )}
 
         <HUD
           hud={hud}
