@@ -125,6 +125,10 @@ export function GameScreen({
   // cannot starve the simulation loop.
   const [sceneReady, setSceneReady] = useState(false);
 
+  // Focus intent tracked in a ref so the race loop (built once per config) can
+  // read it without being rebuilt; state drives the on-screen focus indicator.
+  const inputFocusedRef = useRef(false);
+
   // Always use the latest callbacks without rebuilding the game loop.
   const callbacks = useRef({
     onFinish,
@@ -254,6 +258,12 @@ export function GameScreen({
         case "go":
           audio.play("go");
           setCountLabel("GO!");
+
+          // On touch devices the first tap may have opened the native keyboard;
+          // once the countdown ends, nudge the input back into focus so the
+          // player's very first sentence (which now includes punctuation) can be
+          // typed immediately through the phone keyboard.
+          if (!disposed && inputFocusedRef.current) inputRef.current?.focus({ preventScroll: true });
 
           if (goTimer !== undefined) {
             window.clearTimeout(goTimer);
@@ -703,7 +713,11 @@ export function GameScreen({
           }
           onNitro={handleNitro}
           onFocusRequest={() => {
-            if (!isTouch) focusInput();
+            // Focus the hidden input on every device so the phone's native
+            // keyboard (with its full symbol layout) types directly into the
+            // race. The tap that triggers this is a user gesture, so mobile
+            // browsers are allowed to raise the on-screen keyboard.
+            focusInput();
           }}
           onVirtualKey={handleVirtualKey}
           onVirtualBackspace={handleVirtualBackspace}
@@ -723,8 +737,14 @@ export function GameScreen({
         tabIndex={isTouch ? -1 : 0}
         aria-label="Typing input"
         onInput={onInput}
-        onFocus={() => setInputFocused(true)}
-        onBlur={() => setInputFocused(false)}
+        onFocus={() => {
+          inputFocusedRef.current = true;
+          setInputFocused(true);
+        }}
+        onBlur={() => {
+          inputFocusedRef.current = false;
+          setInputFocused(false);
+        }}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import { envFor, type EnvPalette } from "./environments";
 import { ParticleSystem, type Floater } from "./particles";
 import { buildSentenceQueue } from "./sentences";
 import { buildTrack, LANE_X, SEGMENT_LENGTH, type Track } from "./track";
+import { MAX_ERROR_TRAIL, firstMismatch, isComplete, matchKey, normalizeChar } from "./typing";
 import type { Difficulty, GameEvent, GameEventType, RaceConfig, RaceDistance, RaceResult } from "./types";
 
 export const BASE_MAX_SPEED = 12000; // world units per second at top-speed factor 1.0
@@ -16,7 +17,6 @@ export const DIFFICULTY_BLURB: Record<Difficulty, string> = {
   pro: "Rivals type 40-60 WPM",
   legend: "Rivals type 55-90 WPM",
 };
-const MAX_ERROR_TRAIL = 6;
 const INST_WINDOW = 3;
 
 export type RaceState = "countdown" | "running" | "paused" | "finished";
@@ -42,37 +42,6 @@ export interface CarScreenBox {
   y: number;
   w: number;
   h: number;
-}
-
-function normalizeChar(ch: string) {
-  switch (ch) {
-    case "\u2019":
-    case "\u2018":
-    case "\u02bc":
-      return "'";
-    case "\u201c":
-    case "\u201d":
-      return '"';
-    case "\u00a0":
-      return " ";
-    default:
-      return ch;
-  }
-}
-
-/**
- * Sentence text is written as normal prose, so nearly every sentence opens on a
- * capital letter.  A player typing on a physical keyboard produces lowercase
- * `event.key` values unless they hold Shift, so comparing case-sensitively made
- * the first character of essentially every sentence impossible to enter: the
- * keystroke was counted as an error, combo stayed at 0, acceleration collapsed
- * and the race looked stuck even though the letters on screen kept changing.
- *
- * Typing games are case-insensitive; compare on a case-folded copy of the
- * character while leaving the displayed sentence (and its scoring text) intact.
- */
-function matchKey(ch: string) {
-  return ch.toLowerCase();
 }
 
 export class GameEngine {
@@ -329,8 +298,7 @@ export class GameEngine {
 
   /* ---------- typing ---------- */
   private firstMismatch(): number {
-    for (let i = 0; i < this.typed.length; i++) if (matchKey(this.typed[i]) !== matchKey(this.target[i])) return i;
-    return -1;
+    return firstMismatch(this.typed, this.target);
   }
 
   typeChar(raw: string) {
@@ -348,6 +316,11 @@ export class GameEngine {
     if (this.typed.length === this.target.length && this.firstMismatch() < 0) this.completeSentence();
   }
 
+  /** True when the whole target line has been entered correctly. */
+  get isCurrentLineComplete(): boolean {
+    return isComplete(this.typed, this.target);
+  }
+
   backspace(word = false) {
     if (this.state !== "running" || !this.typed.length) return;
     if (word) {
@@ -361,9 +334,16 @@ export class GameEngine {
     this.typingVersion++;
   }
 
-  /** Reconcile with an external text field (mobile IME). */
-  syncFromInput(value: string) {
+  /**
+   * Reconcile with an external text field (mobile IME).
+   *
+   * Screen readers, voice input and some password managers can omit the final
+   * character from an `input` event; the engine's own state remains the source
+   * of truth, so we incorporate whatever arrived rather than overwriting it.
+   */
+  syncFromInput(rawValue: string) {
     if (this.state !== "running") return;
+    const value = Array.from(rawValue).map(normalizeChar).join("");
     let p = 0;
     while (p < value.length && p < this.typed.length && matchKey(value[p]) === matchKey(this.typed[p])) p++;
     const removed = this.typed.length - p;

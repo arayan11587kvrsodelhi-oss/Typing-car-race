@@ -5,6 +5,8 @@ import type { Difficulty } from "./types";
 export const OPENERS = [
   "Start your engines.",
   "Green light, go!",
+  "Ready, set, go!",
+  "Lights out "+"\u2014"+" go!",
   "Hit the gas now.",
   "Fast fingers win races.",
   "Keep your eyes ahead.",
@@ -47,7 +49,13 @@ export const EASY = [
   "A tidy desk helps a busy mind.",
   "The bridge was built in a single year.",
   "Warm socks make cold nights better.",
-  "Turn left at the second light.",
+  "Turn left at the second light, then go straight.",
+  "Wait "+"\u2014"+" is that my bus?",
+  "Pack a snack, some water, and a map.",
+  "Don't forget to lock the door!",
+  "The sign read: 'Closed for repairs.'",
+  "Did the mail arrive yet?",
+  "She asked, \"Are we there yet?\"",
   "Practice turns effort into skill.",
   "The engine roared to life at dawn.",
   "Tight corners reward steady hands.",
@@ -111,6 +119,14 @@ export const MEDIUM = [
   "The final straight was long enough to overtake two cars at once.",
   "Jupiter is so large that every other planet could fit inside it.",
   "A steady rhythm matters more than bursts of frantic speed.",
+  "The recipe calls for flour, sugar, butter, and eggs; mix them well.",
+  "Her journal entry began: 'Today I finally understood the assignment.'",
+  "Why do we park in a driveway?",
+  "He whispered, \"We made it\" before the lights went out.",
+  "She asked, \"Are we there yet?\"; the kids all laughed.",
+  "Plan the route, check the weather (twice), and leave early.",
+  "The mechanic said, \"It's a small leak; nothing serious.\"",
+  "A well-tuned engine revs smoothly (you can hear it) and never stalls.",
 ];
 
 export const HARD = [
@@ -149,7 +165,57 @@ export const HARD = [
   "Waves crashed against the pier as the fishermen secured their boats before the storm.",
   "The telescope revealed thousands of galaxies in a patch of sky the size of a grain of sand.",
   "Good typists do not look at the keys; they trust their hands and read ahead.",
+  "He said, \"Racing is 90% preparation (and 10% luck)\"; the crew nodded in agreement.",
+  "The team's fearless leader shouted, 'One more lap!' as the crowd erupted.",
+  "Her notes began: 'Measure twice; cut once' (her father's motto).",
+  "Did the pit crew warn the driver before the tire failed?",
+  "The inspector asked, 'Is the paperwork in order?'; the clerk just smiled.",
+  "Careful "+"\u2014"+" the second corner is tighter than it looks.",
 ];
+
+/* ---------- Technical challenges: paths, commands, and code-like text ---------- */
+
+// Intermediate technical text: paths, flags, and light symbols.
+export const TECH = [
+  "Open the file at /usr/local/bin/racer to inspect the build.",
+  "Run: type --fast --level 3 to load the sprint track.",
+  "The log lives at /var/log/race.log (check it first).",
+  "Press Ctrl+S, then select File > Save As.",
+  "Set the port to 8080; the host stays localhost.",
+  "Path C:\\games\\racer\\assets holds the track data.",
+  "Deploy with: npm run build && npm run deploy.",
+  "The config uses key=value pairs; whitespace is ignored.",
+  "Send the report to pit-crew@racing.dev before noon.",
+  "Check the box labeled [ready] and submit the form.",
+  "Syntax: probe [name] with flag --verbose.",
+  "Edit git config user.name \"Track Rat\" in the shell.",
+  "Mix the separators: src/utils\\index.ts is not the same as src/utils/index.ts.",
+  "The backup script copies /home/racer/data into D:\\backup\\racer\\.",
+  "Track issue #42 and close it with a fix=clean commit.",
+];
+
+// Advanced technical text: code, strings, and dense punctuation.
+export const TECH_HARD = [
+  "Type: grep -r \"nitro\" src/game/*.ts to find every match.",
+  "The regex ^\\d{3}-\\d{4}$ matches a phone number like 555-0199.",
+  "Set PATH=C:\\bin;%PATH% and reload the terminal.",
+  "Write: const ratio = (done / total).toFixed(2); for the report.",
+  "Parse args: node race.js --track=alpine --laps=3.",
+  "Parse the URL: https://api.racing.dev/v1/cars?limit=10.",
+  "Commit with: git commit -m 'fix: punctuation in target text'.",
+  "Decode the header: {\"alg\":\"HS256\",\"typ\":\"JWT\"}.",
+  "Query the table: SELECT * FROM laps WHERE time < 60.5;",
+  "Resolve ./src/utils/helpers.ts?raw for the raw import.",
+  "Run (or troll) check: if (wpm >= 60) { rank = \"pro\"; }.",
+  "Filter the list [1, 2, 3].map(n => n * 2).filter(Boolean).",
+  "Back up to D:\\archive\\race_2026\\ before the update.",
+  "The template string `lap ${n}/${total} done` prints the progress.",
+];
+
+const OPENERS_PUNCT = OPENERS;
+export const EASY_PUNCT = EASY;
+export const MEDIUM_PUNCT = MEDIUM;
+export const HARD_PUNCT = HARD;
 
 const TIER_WEIGHTS: Record<Difficulty, [number, number, number]> = {
   rookie: [0.6, 0.35, 0.05],
@@ -168,7 +234,7 @@ function mulberry32(seed: number) {
   };
 }
 
-function shuffle<T>(arr: T[], rnd: () => number): T[] {
+function shuffle<T>(arr: readonly T[], rnd: () => number): T[] {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));
@@ -178,12 +244,21 @@ function shuffle<T>(arr: T[], rnd: () => number): T[] {
 }
 
 /** Builds a race-length queue of sentences: an easy opener, then a weighted random mix. */
+export function pickRandom<T>(arr: readonly T[], rnd: () => number = Math.random): T {
+  return arr[Math.floor(rnd() * arr.length) % arr.length];
+}
+
+/** Technical pools keyed by difficulty tier (0 = intermediate, 2 = advanced). */
+const TECH_TIER: readonly (readonly string[])[] = [[], TECH, TECH_HARD];
+
 export function buildSentenceQueue(difficulty: Difficulty, count: number, seed = Date.now()): string[] {
   const rnd = mulberry32(seed);
-  const pools = [shuffle(EASY, rnd), shuffle(MEDIUM, rnd), shuffle(HARD, rnd)];
+  const pools: string[][] = [shuffle([...OPENERS_PUNCT, ...EASY_PUNCT], rnd), shuffle(MEDIUM_PUNCT, rnd), shuffle(HARD_PUNCT, rnd)];
+  const techPools: string[][] = [shuffle(TECH_TIER[1], rnd), shuffle(TECH_TIER[2], rnd)];
   const cursors = [0, 0, 0];
+  const techCursors = [0, 0];
   const weights = TIER_WEIGHTS[difficulty];
-  const out: string[] = [OPENERS[Math.floor(rnd() * OPENERS.length)]];
+  const out: string[] = [pickRandom(OPENERS, rnd)];
 
   // Ramp: second sentence is always easy, so the player builds momentum before harder lines.
   const pickTier = (i: number) => {
@@ -196,10 +271,37 @@ export function buildSentenceQueue(difficulty: Difficulty, count: number, seed =
 
   for (let i = 0; i < count; i++) {
     const tier = pickTier(i);
+    // Insert a technical typing challenge roughly every sixth line so paths,
+    // commands and code-like text appear at every difficulty without displacing
+    // the normal-sentence progression.
+    const wantTech = tier > 0 && i > 1 && i % 6 === 5;
+    if (wantTech) {
+      const tp = techPools[tier - 1];
+      const t = tp[techCursors[tier - 1] % tp.length];
+      techCursors[tier - 1]++;
+      out.push(t);
+      continue;
+    }
     const pool = pools[tier];
     const s = pool[cursors[tier] % pool.length];
     cursors[tier]++;
     out.push(s);
   }
   return out;
+}
+
+/**
+ * Builds a deterministic, punctuation-heavy queue for tests and tooling: it
+ * covers every required symbol class (basic punctuation, questions/emphasis,
+ * quotes/apostrophes, slashes, brackets, hyphens/underscores and @/#/=).
+ */
+export function buildPunctuationSample(seed = 1): string[] {
+  const rnd = mulberry32(seed);
+  return [
+    ...shuffle(EASY.filter((s) => /[.,]/.test(s)), rnd).slice(0, 3),
+    ...shuffle(MEDIUM.filter((s) => /[?!]/.test(s) || /["']/.test(s)), rnd).slice(0, 3),
+    ...shuffle(TECH, rnd).slice(0, 3),
+    ...shuffle(TECH_HARD, rnd).slice(0, 3),
+    ...shuffle(HARD.filter((s) => /[;:()\[\]]/.test(s)), rnd).slice(0, 3),
+  ];
 }

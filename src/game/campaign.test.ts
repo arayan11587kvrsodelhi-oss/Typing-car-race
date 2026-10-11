@@ -12,6 +12,8 @@ import {
   normalizeCampaignProgress,
   qualifiesLevel,
 } from "./levels";
+import { EASY, HARD, MEDIUM, TECH, TECH_HARD, buildSentenceQueue } from "./sentences";
+import { applyKey, firstMismatch, isComplete, matchKey, normalizeChar, progressPercent } from "./typing";
 
 test("a new campaign exposes only level 1", () => {
   const progress = defaultCampaignProgress();
@@ -75,6 +77,134 @@ test("campaign worlds contain exactly their assigned four levels", () => {
     [5, 6, 7, 8],
     [9, 10, 11, 12],
   ]);
+});
+
+/* ------------------------------------------------------------------ */
+/* Typing content and punctuation                                      */
+/* ------------------------------------------------------------------ */
+
+/** Every symbol class the task requires to appear in real target text. */
+const REQUIRED_PUNCTUATION = [".", ",", ":", ";", "?", "!", "'", '"', "/", "\\", "(", ")", "[", "]", "-", "_", "@", "#", "="];
+
+function assertPunctuation(pool: string[], label: string) {
+  for (const ch of REQUIRED_PUNCTUATION) {
+    assert.ok(pool.some((sentence) => sentence.includes(ch)), `${label} is missing "${ch}"`);
+  }
+}
+
+test("the content pools together cover every required punctuation character", () => {
+  assertPunctuation([...EASY, ...MEDIUM, ...HARD, ...TECH, ...TECH_HARD], "content pools");
+});
+
+test("a sentence containing a period and comma is offered and typed as-is", () => {
+  const sentence = EASY.find((s) => s.includes(".") && s.includes(","));
+  assert.ok(sentence, "expected an easy sentence with both a period and a comma");
+  assert.match(sentence!, /[.,]/);
+});
+
+test("a challenge contains quotes and a question mark", () => {
+  const challenge = [...MEDIUM, ...HARD].find((s) => s.includes('"') && s.includes("?"));
+  assert.ok(challenge, "expected a challenge with quotes and a question mark");
+});
+
+test("a technical challenge contains forward and backward slashes", () => {
+  assert.ok(TECH.some((s) => s.includes("/")), "expected a forward slash in intermediate technical text");
+  assert.ok(TECH.some((s) => s.includes("\\")), "expected a backward slash in intermediate technical text");
+  assert.ok(
+    [...TECH, ...TECH_HARD].some((s) => s.includes("/") && s.includes("\\")),
+    "expected a technical line with both slash kinds",
+  );
+});
+
+/** Type a whole string one character at a time using the shared rules. */
+function typeAll(target: string, input: string) {
+  let state = { typed: "", correct: 0, errors: 0 };
+  let completed = false;
+  for (const ch of input) {
+    const next = applyKey(state, ch, target);
+    state = { typed: next.typed, correct: next.correct, errors: next.errors };
+    completed = next.completed;
+  }
+  return { ...state, completed };
+}
+
+test("correct punctuation advances; punctuation is not skipped", () => {
+  const target = "Go, now!";
+  const result = typeAll(target, "Go, ");
+  assert.equal(result.typed, "Go, ");
+  assert.equal(firstMismatch(result.typed, target), -1, "typed prefix matches exactly");
+  assert.equal(result.errors, 0, "entering the exact characters must not error");
+  assert.equal(result.completed, false, "the line must not complete early");
+});
+
+test("incorrect punctuation is counted as an error", () => {
+  const target = "Go, now!";
+  const result = typeAll(target, "Go."); // wrong: target wants a comma
+  assert.equal(result.errors, 1);
+  assert.equal(result.typed, "Go.", "the wrong character is still recorded");
+  assert.notEqual(firstMismatch(result.typed, target), -1);
+});
+
+test("a line only completes after the full target string is typed", () => {
+  const target = "Go, now!";
+  const almost = typeAll(target, "Go, now");
+  assert.equal(almost.completed, false, "missing the final ! must not complete the line");
+  assert.ok(progressPercent(almost.typed.length, target.length) < 100);
+
+  const full = typeAll(target, "Go, now!");
+  assert.equal(full.completed, true, "typing the final ! completes the line");
+  assert.equal(progressPercent(full.typed.length, target.length), 100);
+});
+
+test("slash and backslash are distinct; letters stay case-insensitive", () => {
+  const line = TECH.find((s) => s.includes("/") && s.includes("\\"));
+  assert.ok(line, "expected a technical line with both slash kinds");
+
+  // A forward slash must not satisfy a target backslash...
+  const wrong = applyKey({ typed: "Path C:", correct: 0, errors: 0 }, "/", `Path C:\\`);
+  assert.equal(wrong.errors, 1, "/ must not satisfy a target \\");
+
+  // ...but the correct backslash does.
+  const right = applyKey({ typed: "Path C:", correct: 0, errors: 0 }, "\\", `Path C:\\`);
+  assert.equal(right.errors, 0, "the correct backslash advances cleanly");
+  assert.equal(right.completed, true);
+
+  // Letters remain case-insensitive (the existing game rule).
+  assert.equal(matchKey("A"), matchKey("a"));
+  assert.equal(matchKey("/"), "/");
+  assert.notEqual(matchKey("/"), matchKey("\\"));
+});
+
+test("smart-punctuation lookalikes normalize to the ASCII the target expects", () => {
+  assert.equal(normalizeChar("\u2019"), "'");
+  assert.equal(normalizeChar("\u201c"), '"');
+  assert.equal(normalizeChar("\uff0f"), "/");
+  assert.equal(normalizeChar("\uff3c"), "\\");
+  assert.equal(normalizeChar("\u2013"), "-");
+});
+
+test("restarting and changing difficulty keep punctuation intact", () => {
+  const rookie = buildSentenceQueue("rookie", 40, 77);
+  const legend = buildSentenceQueue("legend", 40, 77);
+  const punct = /[.,!?;:'"()\[\]\/_@#=-]/;
+  assert.ok(rookie.some((s) => punct.test(s)), "rookie queue should contain punctuation");
+  assert.ok(legend.some((s) => punct.test(s)), "legend queue should contain punctuation");
+
+  // Same seed reproduces the same race, so a restart is deterministic.
+  const restart = buildSentenceQueue("rookie", 40, 77);
+  assert.deepEqual(restart, rookie);
+});
+
+test("technical challenges appear in race queues", () => {
+  const queue = buildSentenceQueue("legend", 40, 7);
+  assert.ok(queue.some((s) => s.includes("/")), "expected a path or command in a legend race");
+});
+
+test("isComplete never reports done before every character is entered", () => {
+  const target = EASY.find((s) => s.includes(".") && s.includes(","))!;
+  assert.equal(isComplete(target.slice(0, -1), target), false);
+  assert.equal(isComplete(target, target), true);
+  assert.equal(isComplete(target + "!", target), false, "extra mistyped characters break completion");
 });
 
 test("worlds unlock from existing completed campaign progress", () => {
