@@ -317,17 +317,99 @@ export function defaultCustomization(def: CarDef): CarCustomization {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+const isHexColor = (value: unknown): value is string =>
+  typeof value === "string" && /^#(?:[\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(value);
+
+/** Resolve a canonical or known legacy car ID without silently accepting unknown IDs. */
+export function normalizeStoredCarId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  if (CARS.some((car) => car.id === value)) return value;
+  const migrated = LEGACY_CAR_MAP[value];
+  return migrated && CARS.some((car) => car.id === migrated) ? migrated : undefined;
+}
+
+/** Normalize upgrade levels at the storage/build boundary so stat multipliers stay finite. */
+export function normalizeCarUpgrades(input: unknown): CarUpgrades {
+  const value = isRecord(input) ? input : {};
+  const result: CarUpgrades = { ...DEFAULT_UPGRADES };
+  const validKeys = ["engine", "turbo", "tires", "nitro", "transmission", "brakes", "suspension"] as const;
+  for (const key of validKeys) {
+    const candidate = value[key];
+    if (typeof candidate !== "number" || !Number.isSafeInteger(candidate) || candidate < 0) continue;
+    const level = Math.min(candidate, MAX_UPGRADE);
+    // Optional legacy upgrade keys are retained when valid; the four current gameplay
+    // multipliers are always present because they are consumed by effectiveStats().
+    (result as unknown as Record<string, number>)[key] = level;
+  }
+  return result;
+}
+
+/** Normalize only known customization options, retaining the car-specific defaults for invalid fields. */
+export function normalizeCarCustomization(def: CarDef, input: unknown): CarCustomization {
+  const result = defaultCustomization(def);
+  if (!isRecord(input)) return result;
+  const value = input;
+  const choose = (key: keyof CarCustomization, options: readonly string[]) => {
+    const candidate = value[key];
+    if (typeof candidate === "string" && options.includes(candidate)) {
+      (result as unknown as Record<string, unknown>)[key] = candidate;
+    }
+  };
+  const ids = (items: readonly { id: string }[]) => items.map((item) => item.id);
+  const glowIds = GLOWS.map((item) => item.id);
+  const partIds = (values: readonly string[]) => values;
+
+  if (isHexColor(value.paint)) result.paint = value.paint;
+  if (isHexColor(value.headlightTint)) result.headlightTint = value.headlightTint;
+  choose("paintFinish", ["gloss", "matte", "metallic", "chrome", "pearl"]);
+  choose("rims", ids(RIMS));
+  choose("wheels", ids(WHEELS));
+  choose("spoiler", ids(SPOILERS));
+  choose("wing", ids(SPOILERS));
+  choose("glow", glowIds);
+  choose("decal", ids(DECALS));
+  choose("headlight", ["stock", "angel", "matrix", "laser"]);
+  choose("drl", ["stock", "blade", "halo", "strip"]);
+  choose("splitter", ["stock", "street", "carbon", "gt"]);
+  choose("diffuser", ["stock", "street", "carbon", "gt"]);
+  choose("skirts", ["stock", "street", "carbon"]);
+  choose("mirrors", ["stock", "sport", "carbon"]);
+  choose("hood", ["stock", "vented", "carbon"]);
+  choose("roof", ["stock", "carbon", "glass"]);
+  choose("seats", ["stock", "sport", "bucket", "race"]);
+  choose("steering", ["stock", "sport", "yoke"]);
+  choose("trim", ["stock", "carbon", "aluminum", "neon"]);
+  choose("ambient", glowIds);
+  choose("brakes", partIds(["stock", "street", "sport", "performance", "racing", "track", "carbon"]));
+  choose("suspension", partIds(["stock", "street", "sport", "performance", "racing", "track"]));
+  choose("tires", partIds(["stock", "street", "sport", "performance", "racing", "track"]));
+  return result;
+}
+
 export function getCar(id: string): CarDef {
   return CARS.find((c) => c.id === migrateCarId(id)) ?? CARS[0];
 }
 
 export function buildFromProfile(profile: Profile): CarBuild {
-  const def = getCar(profile.selectedCar);
+  // Keep this boundary defensive as well as loadProfile(): previews and future callers
+  // should never spread unchecked objects or pass malformed upgrades into stat math.
+  const safeProfile: Record<string, unknown> = isRecord(profile) ? (profile as unknown as Record<string, unknown>) : {};
+  const candidateId = normalizeStoredCarId(safeProfile.selectedCar);
+  const def = getCar(candidateId ?? CARS[0].id);
+  const customizations = isRecord(safeProfile.customizations) ? safeProfile.customizations : {};
+  const upgrades = isRecord(safeProfile.upgrades) ? safeProfile.upgrades : {};
+  const custom = normalizeCarCustomization(def, customizations[def.id]);
+  const normalizedUpgrades = normalizeCarUpgrades(upgrades[def.id]);
+  const rawName = typeof safeProfile.name === "string" && safeProfile.name.length > 0 ? safeProfile.name : "ACE";
   return {
     def,
-    custom: { ...defaultCustomization(def), ...(profile.customizations[def.id] ?? {}) },
-    upgrades: { ...DEFAULT_UPGRADES, ...(profile.upgrades[def.id] ?? {}) },
-    plate: (profile.name || "ACE").toUpperCase().slice(0, 7),
+    custom,
+    upgrades: normalizedUpgrades,
+    plate: rawName.toUpperCase().slice(0, 7),
   };
 }
 
