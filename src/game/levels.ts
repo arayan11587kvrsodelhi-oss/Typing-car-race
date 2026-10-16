@@ -137,11 +137,32 @@ export function normalizeCampaignProgress(input: unknown): CampaignProgress {
     const next = LEVELS.find((item) => item.index === (level?.index ?? 0) + 1);
     if (next) unlocked.push(next.id);
   }
+
+  // Campaign results are also browser-controlled data. Keep only known level IDs and
+  // complete finite records so invalid values cannot surface as NaN in result UI.
+  const bestResults: CampaignProgress["bestResults"] = {};
+  const rawResults = value.bestResults;
+  if (rawResults && typeof rawResults === "object" && !Array.isArray(rawResults)) {
+    for (const [levelId, rawResult] of Object.entries(rawResults)) {
+      if (!validIds.has(levelId) || !rawResult || typeof rawResult !== "object" || Array.isArray(rawResult)) continue;
+      const result = rawResult as Record<string, unknown>;
+      const { wpm, accuracy, place, score } = result;
+      if (
+        typeof wpm === "number" && Number.isFinite(wpm) && wpm >= 0 &&
+        typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy >= 0 && accuracy <= 100 &&
+        typeof place === "number" && Number.isSafeInteger(place) && place >= 0 &&
+        typeof score === "number" && Number.isFinite(score) && score >= 0
+      ) {
+        bestResults[levelId] = { wpm, accuracy, place, score };
+      }
+    }
+  }
+
   return {
     version: 1,
     unlockedLevelIds: [...new Set(unlocked)],
     completedLevelIds: completed,
-    bestResults: value.bestResults && typeof value.bestResults === "object" ? value.bestResults as CampaignProgress["bestResults"] : {},
+    bestResults,
     rewardsClaimed: ids(value.rewardsClaimed),
   };
 }
