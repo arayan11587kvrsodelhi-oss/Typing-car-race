@@ -589,3 +589,49 @@ export function getCar3DProfile(id: string): CarGeometry3D {
 }
 
 export { profiles as ALL_CAR_PROFILES };
+
+// ---------------------------------------------------------------------------
+// Geometry cache helpers
+//
+// `CarModel3D` memoises the generated body geometry per vehicle. Switching
+// garage vehicles and relaunching races must not leak those buffers, so a
+// component registers a disposal callback while it owns a vehicle's geometry
+// and releases that ownership (optionally disposing immediately) on unmount.
+// ---------------------------------------------------------------------------
+
+type DisposeFn = () => void;
+const geometryOwners = new Map<string, Set<DisposeFn>>();
+
+/**
+ * Register a geometry cleanup callback for a vehicle.
+ *
+ * The returned function releases the registration. Pass `disposeNow` when the
+ * unmounting component was the last owner and the geometry should be freed.
+ */
+export function claimCar3DGeometry(carId: string, dispose: DisposeFn): (disposeNow?: boolean) => void {
+  let owners = geometryOwners.get(carId);
+  if (!owners) {
+    owners = new Set();
+    geometryOwners.set(carId, owners);
+  }
+  owners.add(dispose);
+  let released = false;
+  return (disposeNow = false) => {
+    if (released) return;
+    released = true;
+    const current = geometryOwners.get(carId);
+    if (current) {
+      current.delete(dispose);
+      if (current.size === 0) geometryOwners.delete(carId);
+    }
+    if (disposeNow) dispose();
+  };
+}
+
+/** Dispose every cached geometry owned by the given vehicle. */
+export function disposeCar3DGeometry(carId: string): void {
+  const owners = geometryOwners.get(carId);
+  if (!owners) return;
+  geometryOwners.delete(carId);
+  for (const dispose of owners) dispose();
+}

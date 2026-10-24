@@ -10,7 +10,10 @@ import { cn } from "@/utils/cn";
 
 export interface QAComparisonViewProps {
   onBack: () => void;
+  /** Run the selected vehicle in a live race (and make it the saved selection). */
   onRaceCar: (carId: string) => void;
+  /** Optional hook as the inspected vehicle changes; never renders the full lineup. */
+  onSelectCar?: (carId: string) => void;
 }
 
 const QA_CAR_IDS = [
@@ -191,174 +194,10 @@ function SingleStudioScene({
   );
 }
 
-// The lineup row runs along X.
-// All 7 vehicles are placed side-by-side with identical camera height, identical
-// perspective, identical lighting, and identical dark reflective floor.
-const LINEUP_CAMERAS: Record<SilhouetteAngle, { pos: [number, number, number]; target: [number, number, number] }> = {
-  front:   { pos: [0, 2.0, 24],    target: [0, 0.72, 0] },
-  rear:    { pos: [0, 2.0, -24],   target: [0, 0.72, 0] },
-  left:    { pos: [0, 1.85, 34],   target: [0, 0.72, 0] },
-  right:   { pos: [0, 1.85, 34],   target: [0, 0.72, 0] },
-  front34: { pos: [0, 3.2, 28],    target: [0, 0.72, 0] },
-  rear34:  { pos: [0, 3.2, 28],    target: [0, 0.72, 0] },
-  top:     { pos: [0, 32, 0.01],   target: [0, 0.3, 0] },
-  orbit:   { pos: [12, 5.5, 26],   target: [0, 0.72, 0] },
-};
-
-// Spacing along X between cars in the lineup
-function lineupSpacing(angle: SilhouetteAngle): number {
-  switch (angle) {
-    case "left":
-    case "right":
-      return 5.6; // 4.8m cars have 0.8m clear air between them
-    case "front34":
-    case "rear34":
-      return 5.2; // 3/4 perspective spacing
-    case "front":
-    case "rear":
-      return 4.4; // front/rear width spacing
-    default:
-      return 5.2;
-  }
-}
-
-// Yaw each car uniformly so every vehicle presents the identical perspective to the camera
-function lineupYaw(angle: SilhouetteAngle): number {
-  switch (angle) {
-    case "front":   return 0;
-    case "rear":    return Math.PI;
-    case "left":    return Math.PI / 2;
-    case "right":   return -Math.PI / 2;
-    case "front34": return Math.PI / 5.2; // 34.6Â° Front 3/4
-    case "rear34":  return Math.PI - Math.PI / 5.2; // 145.4Â° Rear 3/4
-    case "top":     return 0;
-    default:         return Math.PI / 5.2;
-  }
-}
-
-function LineupStudioScene({
-  builds,
-  angle,
-  stencilMode,
-  onSelectCar,
-}: {
-  builds: CarBuild[];
-  angle: SilhouetteAngle;
-  stencilMode: boolean;
-  onSelectCar?: (id: string) => void;
-}) {
-  const controls = useRef<OrbitControlsImpl | null>(null);
-  const preset = LINEUP_CAMERAS[angle];
-  const spacing = lineupSpacing(angle);
-
-  useEffect(() => {
-    if (!controls.current) return;
-    controls.current.target.set(...preset.target);
-    controls.current.object.position.set(...preset.pos);
-    controls.current.update();
-  }, [angle, preset]);
-
-  return (
-    <>
-      <OrbitControls
-        ref={controls}
-        enablePan={true}
-        minDistance={4}
-        maxDistance={65}
-        maxPolarAngle={Math.PI / 2 + 0.02}
-        autoRotate={angle === "orbit"}
-        autoRotateSpeed={0.8}
-      />
-
-      {/* Uniform Studio Ambient & Light Bank */}
-      <ambientLight intensity={stencilMode ? 0.05 : 0.65} />
-
-      {/* Linear Overhead Light Bank: ensures all 7 vehicles receive identical key, fill, and rim light */}
-      {[-16.5, -11, -5.5, 0, 5.5, 11, 16.5].map((x) => (
-        <group key={`light-rig-${x}`}>
-          {/* Key light overhead softbox */}
-          <directionalLight
-            position={[x, 11, 8]}
-            intensity={stencilMode ? 0.25 : 1.35}
-            castShadow
-            shadow-mapSize={[1024, 1024]}
-          />
-          {/* Front lower fill */}
-          <directionalLight
-            position={[x, 2.5, 14]}
-            intensity={stencilMode ? 0.1 : 0.55}
-            color="#e2eaf4"
-          />
-          {/* Rim light highlight for roofline & haunches */}
-          <directionalLight
-            position={[x, 6, -10]}
-            intensity={stencilMode ? 0.1 : 0.75}
-            color="#ffffff"
-          />
-        </group>
-      ))}
-
-      {/* Dark reflective studio floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
-        <planeGeometry args={[80, 50]} />
-        {stencilMode ? (
-          <meshStandardMaterial color="#f8fafc" roughness={0.9} metalness={0} />
-        ) : (
-          <MeshReflectorMaterial
-            blur={[300, 100]}
-            resolution={1024}
-            mixBlur={0.8}
-            mixStrength={0.7}
-            roughness={0.22}
-            depthScale={1.2}
-            minDepthThreshold={0.4}
-            maxDepthThreshold={1.4}
-            color="#080c14"
-            metalness={0.8}
-            mirror={0.7}
-          />
-        )}
-      </mesh>
-
-      <ContactShadows
-        position={[0, 0, 0]}
-        opacity={stencilMode ? 0.2 : 0.85}
-        scale={50}
-        blur={1.6}
-        far={3.5}
-      />
-
-      {/* Render all 7 cars in a studio lineup row */}
-      {builds.map((build, idx) => {
-        const xPos = (idx - 3) * spacing;
-        return (
-          <group
-            key={build.def.id}
-            position={[xPos, 0, 0]}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectCar?.(build.def.id);
-            }}
-          >
-            <CarModel3D
-              build={build}
-              position={[0, 0, 0]}
-              rotationY={lineupYaw(angle)}
-              inspectPart={null}
-              float={false}
-            />
-          </group>
-        );
-      })}
-    </>
-  );
-}
-
-export function QAComparisonView({ onBack, onRaceCar }: QAComparisonViewProps) {
+export function QAComparisonView({ onBack, onRaceCar, onSelectCar }: QAComparisonViewProps) {
   const [selectedId, setSelectedId] = useState<string>("bmw-m3-competition");
   const [angle, setAngle] = useState<SilhouetteAngle>("front34");
   const [paintMode, setPaintMode] = useState<PaintMode>("satin-silver");
-  const [viewMode, setViewMode] = useState<"single" | "lineup">("lineup");
 
   // Build the 7 CarBuild objects
   const qaBuilds = useMemo<CarBuild[]>(() => {
@@ -400,31 +239,15 @@ export function QAComparisonView({ onBack, onRaceCar }: QAComparisonViewProps) {
           </button>
           <div>
             <h1 className="font-display font-black text-sm text-cyan-300 tracking-wider">
-              3D AUTOMOTIVE STUDIO LINEUP · 7 VEHICLE SILHOUETTES
+              3D AUTOMOTIVE STUDIO · SINGLE VEHICLE SILHOUETTE
             </h1>
             <p className="text-[11px] text-slate-400 font-mono">
-              Identical satin silver · Identical lighting · Identical camera height · Dark reflective floor · Distinct body silhouettes
+              One vehicle at a time · Identical lighting and camera height · Dark reflective floor
             </p>
           </div>
         </div>
 
-        {/* Mode switcher: Single Studio vs All 7 Lineup */}
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-white/10 bg-black/40 p-0.5">
-            <button
-              onClick={() => setViewMode("single")}
-              className={cn("px-3 py-1 text-xs rounded-md font-medium transition", viewMode === "single" ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/40" : "text-slate-400 hover:text-white")}
-            >
-              Single Car Studio
-            </button>
-            <button
-              onClick={() => setViewMode("lineup")}
-              className={cn("px-3 py-1 text-xs rounded-md font-medium transition", viewMode === "lineup" ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/40" : "text-slate-400 hover:text-white")}
-            >
-              All 7 Lineup (Comparison)
-            </button>
-          </div>
-
           <button
             onClick={() => onRaceCar(selectedId)}
             className="rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-lg shadow-cyan-500/20 hover:brightness-110 transition"
@@ -436,9 +259,8 @@ export function QAComparisonView({ onBack, onRaceCar }: QAComparisonViewProps) {
 
       {/* Main Studio Viewport */}
       <div className="relative flex-1 flex overflow-hidden">
-        {/* Left Toolbar: Car Selector (when in single mode) */}
-        {viewMode === "single" && (
-          <aside className="w-64 border-r border-white/10 bg-black/40 backdrop-blur p-3 flex flex-col gap-2 z-10 overflow-y-auto">
+        {/* Left Toolbar: Car Selector (one vehicle at a time) */}
+        <aside className="w-64 border-r border-white/10 bg-black/40 backdrop-blur p-3 flex flex-col gap-2 z-10 overflow-y-auto">
             <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Target Real-World Models</div>
             <div className="flex flex-col gap-1.5">
               {QA_CAR_IDS.map((id) => {
@@ -447,7 +269,7 @@ export function QAComparisonView({ onBack, onRaceCar }: QAComparisonViewProps) {
                 return (
                   <button
                     key={id}
-                    onClick={() => setSelectedId(id)}
+                    onClick={() => { setSelectedId(id); onSelectCar?.(id); }}
                     className={cn(
                       "text-left p-2.5 rounded-xl border text-xs transition flex flex-col gap-0.5",
                       isSelected
@@ -472,33 +294,17 @@ export function QAComparisonView({ onBack, onRaceCar }: QAComparisonViewProps) {
               <div className="flex justify-between"><span>Rear Haunch:</span> <span className="text-cyan-300 font-bold">{prof.body.rearHaunchWidth}x</span></div>
               <div className="flex justify-between"><span>Wheelbase:</span> <span className="text-cyan-300 font-bold">{(prof.wheels.wheelbase * 2).toFixed(2)}m</span></div>
             </div>
-          </aside>
-        )}
+        </aside>
 
         {/* Center: 3D Canvas */}
         <div className={cn("relative flex-1 h-full", stencilMode ? "bg-white" : "bg-gradient-to-b from-[#090e1c] to-[#04060c]")}>
           <Suspense fallback={<div className="h-full flex items-center justify-center text-xs text-cyan-300">Loading 3D Models...</div>}>
             <Canvas
               shadows
-              camera={{
-                position: viewMode === "lineup" ? [0, 4.5, 16] : CAMERA_PRESETS[angle].pos,
-                fov: viewMode === "lineup" ? 42 : 38,
-              }}
+              camera={{ position: CAMERA_PRESETS[angle].pos, fov: 38 }}
               style={{ width: "100%", height: "100%" }}
             >
-              {viewMode === "single" ? (
-                <SingleStudioScene build={activeBuild} angle={angle} stencilMode={stencilMode} />
-              ) : (
-                <LineupStudioScene
-                  builds={qaBuilds}
-                  angle={angle}
-                  stencilMode={stencilMode}
-                  onSelectCar={(id) => {
-                    setSelectedId(id);
-                    setViewMode("single");
-                  }}
-                />
-              )}
+              <SingleStudioScene build={activeBuild} angle={angle} stencilMode={stencilMode} />
             </Canvas>
           </Suspense>
 
@@ -532,40 +338,6 @@ export function QAComparisonView({ onBack, onRaceCar }: QAComparisonViewProps) {
             ))}
           </div>
 
-          {/* Bottom Lineup Legend Bar (when in lineup view) */}
-          {viewMode === "lineup" && (
-            <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-2 p-1.5 rounded-2xl border border-white/15 bg-black/85 backdrop-blur z-10 max-w-[95vw] overflow-x-auto shadow-2xl">
-              {QA_CAR_IDS.map((id, idx) => {
-                const def = getCar(id);
-                const tag = [
-                  "4-Door Sedan · Notchback Trunk",
-                  "Rear-Engine · 911 Flyline",
-                  "Luxury Hypercar · 2.04m Wide",
-                  "Low Aero · Jet Visor Dome",
-                  "Angular Wedge · Planar Facets",
-                  "Smooth Mid-Engine · Buttresses",
-                  "Organic Teardrop · 360° Glass",
-                ][idx];
-                return (
-                  <button
-                    key={id}
-                    onClick={() => {
-                      setSelectedId(id);
-                      setViewMode("single");
-                    }}
-                    title={`Click to inspect ${def.name} in 360°`}
-                    className="flex flex-col items-center px-2.5 py-1 rounded-xl bg-white/5 hover:bg-cyan-500/20 hover:border-cyan-400 border border-white/10 transition text-center"
-                  >
-                    <span className="text-[11px] font-mono font-bold text-slate-100 whitespace-nowrap">
-                      <span className="text-cyan-400 mr-1">{idx + 1}.</span>{def.name}
-                    </span>
-                    <span className="text-[9px] text-slate-400 font-mono whitespace-nowrap">{tag}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
           {/* Paint / Material Mode Toggle */}
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 p-1 rounded-xl border border-white/15 bg-black/75 backdrop-blur z-10">
             <span className="text-[10px] font-mono text-slate-400 px-2 uppercase">QA Material:</span>
@@ -594,8 +366,7 @@ export function QAComparisonView({ onBack, onRaceCar }: QAComparisonViewProps) {
         </div>
 
         {/* Right Info Panel: Model-Specific Identifying Characteristics */}
-        {viewMode === "single" && (
-          <aside className="w-80 border-l border-white/10 bg-black/50 backdrop-blur p-4 flex flex-col gap-3 z-10 overflow-y-auto">
+        <aside className="w-80 border-l border-white/10 bg-black/50 backdrop-blur p-4 flex flex-col gap-3 z-10 overflow-y-auto">
             <div>
               <div className="text-[11px] font-mono uppercase tracking-wider text-cyan-400">Identifying Characteristics</div>
               <h2 className="font-display font-black text-lg text-white">{notes.name}</h2>
@@ -647,8 +418,7 @@ export function QAComparisonView({ onBack, onRaceCar }: QAComparisonViewProps) {
                 Race This Car (In-Game 3D Test)
               </button>
             </div>
-          </aside>
-        )}
+        </aside>
       </div>
     </div>
   );

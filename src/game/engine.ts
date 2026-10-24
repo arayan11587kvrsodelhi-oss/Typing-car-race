@@ -144,7 +144,7 @@ export class GameEngine {
     };
 
     const wpms = OPPONENT_WPM[cfg.difficulty];
-    const lanes = [LANE_X[0], LANE_X[2], LANE_X[3]];
+    const lanes = [LANE_X[1], LANE_X[2], LANE_X[3]];
     const equipment = [
       { rims: "chrome" as const, spoiler: "gt" as const, glow: "#38bdf8", decal: "stripes" as const },
       { rims: "neon" as const, spoiler: "wing" as const, glow: "#f472b6", decal: "number" as const },

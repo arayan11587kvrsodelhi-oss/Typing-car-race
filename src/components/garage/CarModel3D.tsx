@@ -17,12 +17,12 @@
 * hood length, rear proportions, aero layout, wheel size and track all vary.
 */
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { CarBuild, SpoilerStyle } from "@/game/types";
 import { resolvedSpoiler, resolvedWheels } from "@/game/cars";
-import { getCar3DProfile, type CarGeometry3D } from "@/game/car3D";
+import { claimCar3DGeometry, getCar3DProfile, type CarGeometry3D } from "@/game/car3D";
 
 // ---------------------------------------------------------------------------
 // Helper â€” colour utilities
@@ -542,15 +542,15 @@ export function generateMcLaren720SBody(p: CarGeometry3D): THREE.BufferGeometry 
 }
 
 function buildBodyGeometry(p: CarGeometry3D): THREE.BufferGeometry {
-  const id = p.id.toLowerCase();
+  const id = p.id;
   // â”€â”€ Explicit routing: every target model has its own generator. â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  if (id.includes("aventador") || id.includes("revuelto") || id.includes("huracan") || id.includes("lamborghini")) return generateAventadorSVJBody(p);
-  if (id.includes("chiron") || id.includes("bugatti")) return generateBugattiChironBody(p);
-  if (id.includes("jesko") || id.includes("gemera") || id.includes("koenigsegg")) return generateKoenigseggJeskoBody(p);
-  if (id.includes("sf90") || id.includes("296") || id.includes("ferrari")) return generateFerrariSF90Body(p);
-  if (id.includes("mclaren") || id.includes("720") || id.includes("750") || id.includes("765")) return generateMcLaren720SBody(p);
-  if (id.includes("911") || id.includes("porsche")) return generatePorsche911GT3RSBody(p);
-  if (id.includes("bmw") || id.includes("m3") || id.includes("m4") || id.includes("m5") || id.includes("mustang") || id.includes("supra")) return generateBMWM3Body(p);
+  if (id === "lamborghini-aventador-svj" || id === "lamborghini-revuelto") return generateAventadorSVJBody(p);
+  if (id === "bugatti-chiron" || id === "bugatti-bolide") return generateBugattiChironBody(p);
+  if (id === "koenigsegg-jesko" || id === "koenigsegg-regera") return generateKoenigseggJeskoBody(p);
+  if (id === "ferrari-sf90-stradale") return generateFerrariSF90Body(p);
+  if (id === "mclaren-720s") return generateMcLaren720SBody(p);
+  if (id === "porsche-911-gt3-rs" || id === "porsche-911-turbo-s") return generatePorsche911GT3RSBody(p);
+  if (id === "bmw-m3-competition" || id === "bmw-m4-competition") return generateBMWM3Body(p);
 
   // â”€â”€ Explicit generic fallback (NOT used by any of the seven target cars). â”€â”€
   // A neutral enclosed coupe built from the shared profile's own measurements.
@@ -1075,9 +1075,9 @@ function buildWindows(prof: CarGeometry3D): THREE.Group {
   const f = L / 2;
   const halfW = b.width / 2;
 
-  if (id === "bmw-m3-competition" || id.includes("m3") || id.includes("m4")) {
-    // BMW M3 4-Door Sedan Greenhouse
-    // 1. Upright Sedan Windshield (~58Â° rake)
+  if (id === "bmw-m3-competition") {
+    // BMW M3 Competition — 4-Door Sedan Greenhouse
+    // 1. Upright Sedan Windshield (~58° rake)
     const wsAngle = 58 * (Math.PI / 180);
     const wsGeo = new THREE.PlaneGeometry(b.width * 0.64, 0.48);
     const ws = new THREE.Mesh(wsGeo, glass);
@@ -1115,8 +1115,33 @@ function buildWindows(prof: CarGeometry3D): THREE.Group {
     rw.position.set(0, b.rideHeight + 1.04, f - 3.48);
     rw.rotation.x = Math.PI / 2 - rwAngle;
     grp.add(rw);
-  } else if (id === "porsche-911-gt3-rs" || id.includes("911") || id.includes("porsche")) {
-    // Porsche 911 Continuous Flyline Curved Glasshouse
+  } else if (id === "bmw-m4-competition") {
+    // BMW M4 Competition — 2-Door Fastback Coupe Greenhouse (narrower, lower roof than M3)
+    const wsAngle = 62 * (Math.PI / 180);
+    const wsGeo = new THREE.PlaneGeometry(b.width * 0.62, 0.44);
+    const ws = new THREE.Mesh(wsGeo, glass);
+    ws.position.set(0, b.rideHeight + 0.98, f - 1.86);
+    ws.rotation.x = -Math.PI / 2 + wsAngle;
+    grp.add(ws);
+
+    // 2-Door side windows (one big uninterrupted pane per side, no B-pillar)
+    for (const side of [-1, 1]) {
+      const swGeo = new THREE.PlaneGeometry(1.10, 0.34);
+      const sw = new THREE.Mesh(swGeo, glass);
+      sw.position.set(side * (halfW * 0.74), b.rideHeight + 0.96, f - 2.40);
+      sw.rotation.y = side * Math.PI / 2;
+      grp.add(sw);
+    }
+
+    // Fastback rear window (steeper slope than M3 notchback)
+    const rwAngle = 60 * (Math.PI / 180);
+    const rwGeo = new THREE.PlaneGeometry(b.width * 0.58, 0.38);
+    const rw = new THREE.Mesh(rwGeo, glass);
+    rw.position.set(0, b.rideHeight + 0.90, f - 3.36);
+    rw.rotation.x = Math.PI / 2 - rwAngle;
+    grp.add(rw);
+  } else if (id === "porsche-911-gt3-rs" || id === "porsche-911-turbo-s") {
+    // Porsche 911 — Continuous Flyline Curved Glasshouse (shared by both GT3 RS and Turbo S)
     const wsGeo = new THREE.PlaneGeometry(b.width * 0.62, 0.44);
     const ws = new THREE.Mesh(wsGeo, glass);
     ws.position.set(0, b.rideHeight + 0.86, f - 1.28);
@@ -1136,8 +1161,8 @@ function buildWindows(prof: CarGeometry3D): THREE.Group {
     rw.position.set(0, b.rideHeight + 0.76, f - 2.60);
     rw.rotation.x = 0.54;
     grp.add(rw);
-  } else if (id === "bugatti-chiron" || id.includes("chiron") || id.includes("bugatti")) {
-    // Bugatti Chiron: Wide low greenhouse framed by C-line
+  } else if (id === "bugatti-chiron" || id === "bugatti-bolide") {
+    // Bugatti — Wide low greenhouse framed by C-line (both Chiron and Bolide)
     const wsGeo = new THREE.PlaneGeometry(b.width * 0.60, 0.42);
     const ws = new THREE.Mesh(wsGeo, glass);
     ws.position.set(0, b.rideHeight + 0.74, f - 1.72);
@@ -1157,8 +1182,8 @@ function buildWindows(prof: CarGeometry3D): THREE.Group {
     rw.position.set(0, b.rideHeight + 0.70, f - 2.80);
     rw.rotation.x = 0.50;
     grp.add(rw);
-  } else if (id === "koenigsegg-jesko" || id.includes("jesko") || id.includes("koenigsegg")) {
-    // Koenigsegg Jesko: Jet-fighter wraparound visor dome
+  } else if (id === "koenigsegg-jesko" || id === "koenigsegg-regera") {
+    // Koenigsegg — Jet-fighter wraparound visor dome (Jesko and Regera)
     const wsGeo = new THREE.PlaneGeometry(b.width * 0.60, 0.40);
     const ws = new THREE.Mesh(wsGeo, glass);
     ws.position.set(0, b.rideHeight + 0.66, f - 1.82);
@@ -1178,8 +1203,8 @@ function buildWindows(prof: CarGeometry3D): THREE.Group {
     rw.position.set(0, b.rideHeight + 0.64, f - 2.75);
     rw.rotation.x = 0.52;
     grp.add(rw);
-  } else if (id === "lamborghini-aventador-svj" || id.includes("aventador") || id.includes("lamborghini")) {
-    // Lamborghini Aventador SVJ: Extreme angular wedge canopy
+  } else if (id === "lamborghini-aventador-svj" || id === "lamborghini-revuelto") {
+    // Lamborghini — Extreme angular wedge canopy (Aventador SVJ and Revuelto)
     const wsGeo = new THREE.PlaneGeometry(b.width * 0.60, 0.42);
     const ws = new THREE.Mesh(wsGeo, glass);
     ws.position.set(0, b.rideHeight + 0.68, f - 1.95);
@@ -1199,7 +1224,7 @@ function buildWindows(prof: CarGeometry3D): THREE.Group {
     rw.position.set(0, b.rideHeight + 0.66, f - 2.95);
     rw.rotation.x = 0.55;
     grp.add(rw);
-  } else if (id === "ferrari-sf90-stradale" || id.includes("sf90") || id.includes("ferrari")) {
+  } else if (id === "ferrari-sf90-stradale") {
     // Ferrari SF90 Stradale: Cab-forward bubble canopy
     const wsGeo = new THREE.PlaneGeometry(b.width * 0.62, 0.42);
     const ws = new THREE.Mesh(wsGeo, glass);
@@ -1221,7 +1246,7 @@ function buildWindows(prof: CarGeometry3D): THREE.Group {
     rw.rotation.x = 0.50;
     grp.add(rw);
   } else {
-    // McLaren 720S: Teardrop 360-degree glasshouse
+    // McLaren 720S (and any unrecognised vehicle): Teardrop 360-degree glasshouse
     const wsGeo = new THREE.PlaneGeometry(b.width * 0.64, 0.44);
     const ws = new THREE.Mesh(wsGeo, glass);
     ws.position.set(0, b.rideHeight + 0.72, f - 1.48);
@@ -1661,12 +1686,26 @@ export function CarModel3D({
   });
 
   // Memoize heavy geometry
-  const bodyGeo = useMemo(() => buildBodyGeometry(prof), [pid]);
+  const bodyGeo = useMemo(() => buildBodyGeometry(prof), [prof]);
+
+  // Free the cached body buffers when this model unmounts; when a newer model for
+  // the same vehicle has already claimed the profile, the old geometry is stale
+  // and can be disposed immediately. Shared GPU state is left to three.js.
+  useEffect(() => {
+    const release = claimCar3DGeometry(pid, () => bodyGeo.dispose());
+    return () => release(true);
+  }, [pid, bodyGeo]);
 
   const paintMaterial = useMemo(
     () => paintMat(paint, prof.clearcoatStrength, prof.metallicness, prof.roughness),
     [paint, prof.clearcoatStrength, prof.metallicness, prof.roughness]
   );
+
+  useEffect(() => {
+    return () => {
+      paintMaterial.dispose();
+    };
+  }, [paintMaterial]);
   const b = prof.body;
   const wh = prof.wheels;
   const halfW = b.width / 2;

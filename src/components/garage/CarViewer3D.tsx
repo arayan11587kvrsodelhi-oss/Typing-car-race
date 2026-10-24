@@ -5,10 +5,11 @@
  * every car keeps its own silhouette and equipment without a WebGL scene.
  */
 import { useEffect } from "react";
-import type { CarBuild } from "@/game/types";
+import type { CarBuild, GraphicsQuality } from "@/game/types";
 import { CarPreview } from "../CarPreview";
 
 export type ViewerPreset = "front" | "rear" | "left" | "right" | "top" | "cockpit" | "reset";
+export type ViewerMode = "3d" | "flat";
 export interface ViewerRequest { preset: ViewerPreset; nonce: number; }
 export interface ViewerProps {
   build: CarBuild;
@@ -17,24 +18,30 @@ export interface ViewerProps {
   inspectPart: string | null;
   request: ViewerRequest | null;
   onReady?: () => void;
+  opponentBuilds?: CarBuild[];
+  mode?: ViewerMode;
+  quality?: GraphicsQuality;
 }
 
-export function CarViewer3D({ build, garageId = "obsidian", autoRotate, inspectPart, request, onReady }: ViewerProps) {
+export function CarViewer3D({ build, garageId = "obsidian", autoRotate, inspectPart, request, onReady, mode = "3d", quality = "low" }: ViewerProps) {
   useEffect(() => { onReady?.(); }, [onReady, build.def.id]);
 
   const accent =
-    garageId === "neon-city" ? "#e879f9" :
-    garageId === "desert-hangar" ? "#fbbf24" :
-    garageId === "alpine" ? "#7dd3fc" :
-    garageId === "underground" ? "#a78bfa" :
-    "#22d3ee";
+    garageId === "neon-city" ? quality === "high" ? "#e879f9" : quality === "medium" ? "#b87cf2" : "#e879f9" :
+    garageId === "desert-hangar" ? quality === "high" ? "#fbbf24" : quality === "medium" ? "#f5d76e" : "#fbbf24" :
+    garageId === "alpine" ? quality === "high" ? "#7dd3fc" : quality === "medium" ? "#64d2e1" : "#7dd3fc" :
+    garageId === "underground" ? quality === "high" ? "#a78bfa" : quality === "medium" ? "#c9d1d9" : "#a78bfa" :
+    quality === "high" ? "#22d3ee" : quality === "medium" ? "#64b5f2" : "#22d3ee";
   const preset = request?.preset ?? "rear";
+  const isFlat = mode === "flat";
   const transform =
+    isFlat ? "none" :
     preset === "left" ? "translateX(-3%) rotate(-2deg)" :
     preset === "right" ? "translateX(3%) rotate(2deg)" :
     preset === "top" ? "scale(0.9) translateY(-4%)" :
-    preset === "cockpit" ? "scale(1.08) translateY(3%)" :
-    "none";
+    preset === "cockpit" ? "scale(1.08) translateY(3%)" : "none";
+
+
 
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: `radial-gradient(ellipse at 50% 42%, ${accent}22 0%, #05070d 70%)` }}>

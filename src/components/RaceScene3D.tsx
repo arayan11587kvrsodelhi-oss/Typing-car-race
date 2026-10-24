@@ -42,7 +42,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { GameEngine } from "@/game/engine";
-import { SEGMENT_LENGTH } from "@/game/track";
+import { SEGMENT_LENGTH, LANE_X } from "@/game/track";
 import type { CarBuild, GraphicsQuality } from "@/game/types";
 import type { EnvPalette } from "@/game/environments";
 import { CarModel3D } from "./garage/CarModel3D";
@@ -327,7 +327,7 @@ function World({ engineRef, playerBuild, env, opponentBuilds, quality: qualityId
   }, [onReady]);
 
   // Lanes (metres) for the three rivals, matching the track's LANE_X spread.
-  const oppLanes = useMemo(() => [-3.0, 0, 3.0], []);
+  const oppLanes = useMemo(() => [LANE_X[1], LANE_X[2], LANE_X[3]], []);
 
   useFrame((_, rawDt) => {
     const engine = engineRef.current;
