@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
-import { CARS, buildFromProfile, effectiveStats } from "./cars";
+import {
+  CARS,
+  DEFAULT_UPGRADES,
+  buildForCar,
+  buildFromProfile,
+  effectiveStats,
+  isCarOwned,
+  normalizeCarCustomization,
+  resolveSelectableCarId,
+} from "./cars";
 import { LEVELS, normalizeCampaignProgress } from "./levels";
 import { defaultProfile, loadProfile, loadScores, normalizeProfile, saveProfile, submitScore } from "./storage";
 import type { Profile, ScoreEntry } from "./types";
@@ -228,4 +237,62 @@ test("submitScore saves normalized entries and ignores invalid scores", () => {
   assert.equal(persisted[0].id, "new-score");
   assert.equal(submitScore({ ...base, score: Number.NaN } as unknown as ScoreEntry), 0);
   assert.equal(loadScores().length, 1);
+});
+
+test("vehicle garage selection accepts owned cars and keeps locked ones locked", () => {
+  const base = { ...defaultProfile(), credits: 50_000 };
+  const owned = CARS[0].id;
+  const locked = CARS.find((car) => car.id !== owned && !base.ownedCars.includes(car.id))!;
+
+  assert.equal(isCarOwned(base, owned), true);
+  assert.equal(isCarOwned(base, locked.id), false);
+  // A locked vehicle can never become the active race vehicle.
+  assert.equal(resolveSelectableCarId(base, locked.id), owned);
+  // An unknown vehicle falls back to the current owned selection.
+  assert.equal(resolveSelectableCarId(base, "missing-car"), owned);
+
+  const purchased = normalizeProfile({ ...base, ownedCars: [...base.ownedCars, locked.id] });
+  assert.equal(resolveSelectableCarId(purchased, locked.id), locked.id);
+  const build = buildFromProfile({ ...purchased, selectedCar: locked.id });
+  assert.equal(build.def.id, locked.id, "the race build matches the selected vehicle");
+  assert.equal(buildFromProfile({ ...purchased, selectedCar: owned }).def.id, owned);
+});
+
+test("saving and reloading keeps the selected vehicle used by the race", () => {
+  const owned = CARS[0].id;
+  const extra = CARS.find((car) => car.id !== owned)!;
+  saveProfile({
+    ...defaultProfile(),
+    ownedCars: [owned, extra.id],
+    selectedCar: extra.id,
+    customizations: { [extra.id]: { ...normalizeCarCustomization(extra, {}), paint: "#123456" } },
+    upgrades: { [extra.id]: { engine: 2, turbo: 1, tires: 0, nitro: 3 } },
+  } as unknown as Profile);
+
+  const reloaded = loadProfile();
+  assert.equal(reloaded.selectedCar, extra.id);
+  const build = buildFromProfile(reloaded);
+  assert.equal(build.def.id, extra.id);
+  assert.equal(build.custom.paint, "#123456");
+  assert.equal(build.upgrades.engine, 2);
+  assert.equal(build.upgrades.nitro, 3);
+});
+
+test("a selection referencing an unowned vehicle falls back to an owned one", () => {
+  const owned = CARS[0].id;
+  const unowned = CARS.find((car) => car.id !== owned)!;
+  const profile = normalizeProfile({ ownedCars: [owned], selectedCar: unowned.id });
+  assert.equal(profile.selectedCar, owned);
+  assert.equal(buildFromProfile(profile).def.id, owned);
+});
+
+test("garage previews build real stats for any vehicle through the shared definitions", () => {
+  for (const car of CARS) {
+    const build = buildForCar(defaultProfile(), car.id);
+    assert.equal(build.def.id, car.id);
+    assert.deepEqual(build.upgrades, DEFAULT_UPGRADES);
+    const stats = effectiveStats(build);
+    assert.ok(Object.values(stats).every((value) => Number.isFinite(value) && value > 0));
+    assert.equal(stats.top.toFixed(6), car.stats.top.toFixed(6));
+  }
 });

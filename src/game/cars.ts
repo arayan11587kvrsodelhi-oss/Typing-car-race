@@ -394,6 +394,62 @@ export function getCar(id: string): CarDef {
   return CARS.find((c) => c.id === migrateCarId(id)) ?? CARS[0];
 }
 
+export const CAR_CLASS_LABEL: Record<CarClass, string> = {
+  starter: "Starter",
+  sport: "Sport",
+  supercar: "Supercar",
+  hypercar: "Hypercar",
+};
+
+/** True when the profile's garage contains the vehicle (normalized ID aware). */
+export function isCarOwned(profile: Pick<Profile, "ownedCars">, carId: string): boolean {
+  const id = normalizeStoredCarId(carId);
+  return !!id && Array.isArray(profile.ownedCars) && profile.ownedCars.includes(id);
+}
+
+/**
+ * The vehicle the garage may actually select.
+ *
+ * Locked vehicles can never become the active car: an unknown or unowned ID
+ * falls back to the currently owned selection, then to the starter car.
+ */
+export function resolveSelectableCarId(profile: Pick<Profile, "ownedCars" | "selectedCar">, requestedId: string): string {
+  const requested = normalizeStoredCarId(requestedId);
+  if (requested && isCarOwned(profile, requested)) return requested;
+  // Unknown or locked target: fall straight back to the saved selection if it is
+  // still owned, then to the first owned vehicle in save order, then the starter.
+  const selected = normalizeStoredCarId(profile.selectedCar);
+  if (selected && isCarOwned(profile, selected)) return selected;
+  const firstOwned = (Array.isArray(profile.ownedCars) ? profile.ownedCars : [])
+    .map((id) => normalizeStoredCarId(id))
+    .find((id): id is string => Boolean(id) && CARS.some((car) => car.id === id));
+  return firstOwned ?? CARS[0].id;
+}
+
+/** Customization for one vehicle, with car-specific defaults filled in. */
+export function customizationFor(profile: Pick<Profile, "customizations">, def: CarDef): CarCustomization {
+  const stored = isRecord(profile.customizations) ? profile.customizations : {};
+  return { ...defaultCustomization(def), ...(stored[def.id] ?? {}) };
+}
+
+/** Upgrade levels for one vehicle, bounded like the storage boundary. */
+export function upgradesFor(profile: Pick<Profile, "upgrades">, carId: string): CarUpgrades {
+  const stored = isRecord(profile.upgrades) ? profile.upgrades : {};
+  return { ...DEFAULT_UPGRADES, ...normalizeCarUpgrades(stored[carId]) };
+}
+
+/** Build a preview/race build for any vehicle, whether owned or not (garage showcase). */
+export function buildForCar(profile: Profile, carId: string): CarBuild {
+  const def = getCar(carId);
+  const rawName = typeof profile.name === "string" && profile.name.length > 0 ? profile.name : "ACE";
+  return {
+    def,
+    custom: customizationFor(profile, def),
+    upgrades: upgradesFor(profile, def.id),
+    plate: rawName.toUpperCase().slice(0, 7),
+  };
+}
+
 export function buildFromProfile(profile: Profile): CarBuild {
   // Keep this boundary defensive as well as loadProfile(): previews and future callers
   // should never spread unchecked objects or pass malformed upgrades into stat math.
@@ -402,11 +458,19 @@ export function buildFromProfile(profile: Profile): CarBuild {
   const def = getCar(candidateId ?? CARS[0].id);
   const customizations = isRecord(safeProfile.customizations) ? safeProfile.customizations : {};
   const upgrades = isRecord(safeProfile.upgrades) ? safeProfile.upgrades : {};
-  const custom = normalizeCarCustomization(def, customizations[def.id]);
-  const normalizedUpgrades = normalizeCarUpgrades(upgrades[def.id]);
+  const selectedId = resolveSelectableCarId(
+    {
+      ownedCars: Array.isArray(safeProfile.ownedCars) ? (safeProfile.ownedCars as string[]) : [],
+      selectedCar: candidateId ?? CARS[0].id,
+    },
+    def.id,
+  );
+  const selectedDef = getCar(selectedId);
+  const custom = normalizeCarCustomization(selectedDef, customizations[selectedDef.id]);
+  const normalizedUpgrades = normalizeCarUpgrades(upgrades[selectedDef.id]);
   const rawName = typeof safeProfile.name === "string" && safeProfile.name.length > 0 ? safeProfile.name : "ACE";
   return {
-    def,
+    def: selectedDef,
     custom,
     upgrades: normalizedUpgrades,
     plate: rawName.toUpperCase().slice(0, 7),
@@ -441,3 +505,49 @@ export const RIVALS = [
   { def: getCar("lamborghini-aventador-svj"), paint: "#ec4899", name: "Pixel" },
   { def: getCar("mclaren-720s"), paint: "#3b82f6", name: "Tank" },
 ];
+
+/**
+ * Generate opponent car builds matching the engine's opponent creation logic.
+ * This ensures the garage and race scene display the same car configurations:
+ * - Excludes the player's car type from the RIVALS pool
+ * - Selects the first 3 rivals
+ * - Applies the same equipment array for rims, spoiler, glow, and decal
+ * - Uses each rival's fixed paint color and shape
+ */
+export function generateOpponentBuilds(playerBuild: CarBuild): CarBuild[] {
+  const equipment = [
+    { rims: "chrome" as const, spoiler: "gt" as const, glow: "#38bdf8" as const, decal: "stripes" as const },
+    { rims: "neon" as const, spoiler: "wing" as const, glow: "#f472b6" as const, decal: "number" as const },
+    { rims: "steel" as const, spoiler: "lip" as const, glow: "#fbbf24" as const, decal: "checker" as const },
+  ];
+
+  const rivalPool = RIVALS.filter((r) => r.def.id !== playerBuild.def.id).slice(0, 3);
+
+  return rivalPool.map((r, i) => {
+    const kit = equipment[i % equipment.length];
+    const opts: CarBuild = {
+      def: r.def,
+      custom: {
+        paint: r.paint,
+        rims: kit.rims,
+        spoiler: kit.spoiler,
+        glow: kit.glow,
+        decal: kit.decal,
+        paintFinish: undefined,
+        wheels: undefined,
+        headlight: undefined,
+        headlightTint: undefined,
+        drl: undefined,
+        splitter: undefined,
+        diffuser: undefined,
+        skirts: undefined,
+        mirrors: undefined,
+        hood: undefined,
+        roof: undefined,
+      },
+      upgrades: {} as CarUpgrades,
+      plate: r.name.toUpperCase(),
+    };
+    return opts;
+  });
+}

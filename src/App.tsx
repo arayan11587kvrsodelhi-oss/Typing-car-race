@@ -10,9 +10,7 @@ import { loadCampaignProgress, saveCampaignProgress } from "./game/storage";
 import { completeLevel, defaultCampaignProgress, isLevelUnlocked, levelById, type CampaignProgress } from "./game/levels";
 import type { Profile, RaceConfig, RaceResult, ScoreEntry } from "./game/types";
 
-import { QAComparisonView } from "./components/qa/QAComparisonView";
-
-type Screen = "menu" | "garage" | "scores" | "race" | "qa";
+type Screen = "menu" | "garage" | "scores" | "race";
 
 export default function App() {
   const [profile, setProfileState] = useState<Profile>(() => loadProfile());
@@ -39,7 +37,7 @@ export default function App() {
     window.history.replaceState({ screen: "menu" }, "", window.location.href);
     const handlePopState = (event: PopStateEvent) => {
       const nextScreen = event.state?.screen;
-      setScreen(nextScreen === "garage" || nextScreen === "scores" || nextScreen === "qa" ? nextScreen : "menu");
+      setScreen(nextScreen === "garage" || nextScreen === "scores" ? nextScreen : "menu");
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -171,7 +169,6 @@ export default function App() {
   const goMenu = useCallback(() => navigateTo("menu"), [navigateTo]);
   const goGarage = useCallback(() => navigateTo("garage"), [navigateTo]);
   const goScores = useCallback(() => navigateTo("scores"), [navigateTo]);
-  const goQA = useCallback(() => navigateTo("qa"), [navigateTo]);
   const toggleMute = useCallback(() => updateSettings({ muted: !settingsRef.current.muted }), [updateSettings]);
 
   return (
@@ -191,31 +188,19 @@ export default function App() {
           onQuickRace={startQuickRace}
           onGarage={goGarage}
           onScores={goScores}
-          onQA={goQA}
         />
       )}
-      {screen === "garage" && <Garage profile={profile} onProfile={setProfile} onBack={goMenu} onRace={startRace} onQA={goQA} />}
-      {screen === "scores" && <HighScores scores={scores} onBack={goMenu} onChange={() => setScores(loadScores())} highlightId={lastScoreId} />}
-      {screen === "qa" && (
-        <QAComparisonView
+      {screen === "garage" && (
+        <Garage
+          profile={profile}
+          settings={settings}
+          onProfile={setProfile}
+          onSettings={updateSettings}
           onBack={goMenu}
-          onRaceCar={(carId) => {
-            const nextProf = { ...profileRef.current, selectedCar: carId };
-            setProfile(nextProf);
-            setRaceConfig({
-              build: buildFromProfile(nextProf),
-              difficulty: settingsRef.current.difficulty,
-              distance: settingsRef.current.distance,
-              environment: settingsRef.current.environment,
-              graphicsQuality: settingsRef.current.graphicsQuality,
-              playerName: nextProf.name || "ACE",
-              seed: Math.floor(Math.random() * 1e9),
-            });
-            window.history.pushState({ screen: "race" }, "", window.location.href);
-            setScreen("race");
-          }}
+          onRace={() => startRace()}
         />
       )}
+      {screen === "scores" && <HighScores scores={scores} onBack={goMenu} onChange={() => setScores(loadScores())} highlightId={lastScoreId} />}
       {screen === "race" && raceConfig && (
         <GameScreen
           key={raceConfig.seed}

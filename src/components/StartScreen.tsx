@@ -27,7 +27,6 @@ interface Props {
   onQuickRace: () => void;
   onGarage: () => void;
   onScores: () => void;
-  onQA?: () => void;
 }
 
 const ENV_GRADIENT: Partial<Record<EnvironmentId, string>> = {
@@ -61,7 +60,7 @@ const STAT_ICONS = {
   ),
 };
 
-export function StartScreen({ profile, settings, build, scores, campaign, selectedLevelId, onSelectLevel, onSettings, onName, onStart, onQuickRace, onGarage, onScores, onQA }: Props) {
+export function StartScreen({ profile, settings, build, scores, campaign, selectedLevelId, onSelectLevel, onSettings, onName, onStart, onQuickRace, onGarage, onScores }: Props) {
   const demoConfig = useMemo<RaceConfig>(
     () => ({ build, difficulty: "pro", distance: "marathon", environment: settings.environment, playerName: profile.name, demo: true }),
     [build, settings.environment, profile.name],
@@ -100,7 +99,7 @@ export function StartScreen({ profile, settings, build, scores, campaign, select
       <div className="absolute inset-0 bg-gradient-to-r from-[#05070f]/95 via-[#05070f]/70 to-[#05070f]/30 pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-t from-[#05070f] via-transparent to-[#05070f]/60 pointer-events-none" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent animate-scan pointer-events-none opacity-40" />
-      
+
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-cyan-300/5 blur-[120px] animate-pulse-slow" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-fuchsia-300/5 blur-[120px] animate-pulse-slow" style={{ animationDelay: "2s" }} />
@@ -316,7 +315,7 @@ export function StartScreen({ profile, settings, build, scores, campaign, select
                   })}
                 </div>
               </div>
-              
+
               <div className="relative mt-3 h-[200px] sm:h-[280px] rounded-2xl overflow-hidden bg-gradient-to-b from-[#0b1020] to-[#05070f] border border-white/5">
                 <CarPreview build={build} />
               </div>
@@ -365,17 +364,9 @@ export function StartScreen({ profile, settings, build, scores, campaign, select
                 </svg>
                 Garage · Customize & Upgrade
               </Button>
-              
-              {onQA && (
-                <Button variant="ghost" size="sm" onClick={onQA} className="mt-2 w-full text-cyan-300 border border-cyan-400/40 hover:bg-cyan-500/15 font-bold flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <path d="M12 6v6l4 2"></path>
-                  </svg>
-                  Automotive Lineup (All 7 Vehicles)
-                </Button>
-              )}
-              
+
+
+
               {best && (
                 <div className="mt-4 pt-4 border-t border-white/5 text-center text-xs font-ui text-slate-400">
                   <div className="text-[10px] uppercase tracking-wider mb-1 text-slate-500">Current Leader</div>

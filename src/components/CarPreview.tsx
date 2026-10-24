@@ -4,15 +4,33 @@ import { resolvedSpoiler } from "@/game/cars";
 import type { CarBuild } from "@/game/types";
 import { cn } from "@/utils/cn";
 
-export function CarPreview({ build, className, compact = false }: { build: CarBuild; className?: string; compact?: boolean }) {
+/**
+ * Canvas 2D vehicle preview shared by the race renderer, the main menu and the
+ * garage. `variant="thumb"` draws just the cached sprite (no floor, grid or
+ * reflection) and is used for the garage selection strip on low-performance
+ * machines instead of loading a second WebGL context.
+ */
+export function CarPreview({
+  build,
+  className,
+  compact = false,
+  variant = "full",
+}: {
+  build: CarBuild;
+  className?: string;
+  compact?: boolean;
+  variant?: "full" | "thumb";
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
+    const thumb = variant === "thumb";
     const draw = () => {
       const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const maxDpr = thumb ? 1 : 2;
+      const dpr = Math.min(maxDpr, window.devicePixelRatio || 1);
       const w = Math.max(1, Math.floor(rect.width));
       const h = Math.max(1, Math.floor(rect.height));
       canvas.width = w * dpr;
@@ -28,8 +46,15 @@ export function CarPreview({ build, className, compact = false }: { build: CarBu
         glow: build.custom.glow,
         decal: build.custom.decal,
         plate: build.plate,
-        width: 640,
+        width: thumb || compact ? 360 : 640,
       });
+      if (thumb) {
+        // Compact sprite only — used for the garage selection strip.
+        const tw = Math.min(w * 0.94, h * 1.6);
+        const th = tw * (sprite.h / sprite.w);
+        ctx.drawImage(sprite.canvas, w / 2 - tw / 2, h / 2 - th / 2, tw, th);
+        return;
+      }
       const paint = build.custom.paint;
       const glow = build.custom.glow !== "none" ? build.custom.glow : paint;
       const groundY = h * (compact ? 0.78 : 0.72);
@@ -83,7 +108,7 @@ export function CarPreview({ build, className, compact = false }: { build: CarBu
     const ro = new ResizeObserver(draw);
     ro.observe(canvas);
     return () => ro.disconnect();
-  }, [build, compact]);
+  }, [build, compact, variant]);
 
   return <canvas ref={ref} className={cn("w-full h-full", className)} />;
 }

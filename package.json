@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:campaign": "tsx src/game/campaign.test.ts"
+    "test:campaign": "tsx src/game/campaign.test.ts",
+    "test:garage": "tsx --test src/game/garage.test.ts",
+    "test": "tsx --test src/game/storage.test.ts src/game/garage.test.ts src/game/campaign.test.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
@@ -16,7 +18,7 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "tailwind-merge": "3.4.0",
-    "three": "^0.186.1"
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
@@ -24,7 +26,7 @@
     "@types/node": "22.19.17",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
-    "@types/three": "^0.186.0",
+    "@types/three": "^0.182.0",
     "@vitejs/plugin-react": "5.1.1",
     "tailwindcss": "4.1.17",
     "tsx": "^4.23.15",
